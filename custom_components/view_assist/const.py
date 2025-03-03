@@ -23,7 +23,7 @@ JSMODULES = [
     {
         "name": "View Assist Helper",
         "filename": "view_assist.js",
-        "version": "1.0.1",
+        "version": "1.0.2",
     },
 ]
 
@@ -109,7 +109,6 @@ CONF_VIEW_TIMEOUT = "view_timeout"
 CONF_DO_NOT_DISTURB = "do_not_disturb"
 CONF_USE_ANNOUNCE = "use_announce"
 CONF_MIC_UNMUTE = "micunmute"
-CONF_DEV_MIMIC = "dev_mimic"
 
 # Config default values
 DEFAULT_NAME = "View Assist"
@@ -136,7 +135,6 @@ DEFAULT_MIC_UNMUTE = False
 ATTR_EVENT_NAME = "event_name"
 ATTR_EVENT_DATA = "event_data"
 ATTR_PATH = "path"
-ATTR_DEVICE = "device"
 ATTR_DOWNLOAD_IF_MISSING = "download_if_missing"
 ATTR_FORCE_DOWNLOAD = "force_download"
 ATTR_OVERWRITE = "overwrite"
@@ -148,6 +146,7 @@ ATTR_INCLUDE_EXPIRED = "include_expired"
 ATTR_MEDIA_FILE = "media_file"
 ATTR_RESUME_MEDIA = "resume_media"
 ATTR_MAX_REPEATS = "max_repeats"
+ATTR_DISPLAY_INDEX = "display_index"
 
 VA_ATTRIBUTE_UPDATE_EVENT = "va_attr_update_event_{}"
 

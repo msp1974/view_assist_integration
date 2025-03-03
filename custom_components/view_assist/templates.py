@@ -10,7 +10,6 @@ from homeassistant.helpers.template import Template, TemplateEnvironment
 from .helpers import (
     get_config_entry_by_config_data_value,
     get_entities_by_attr_filter,
-    get_mimic_entity_id,
     get_sensor_entity_from_instance,
 )
 
@@ -108,8 +107,6 @@ class ViewAssistEntity:
 
         if entry := get_config_entry_by_config_data_value(self._hass, param):
             return get_sensor_entity_from_instance(self._hass, entry.entry_id)
-        if mimic:
-            return get_mimic_entity_id(self._hass)
         return None
 
     def __repr__(self) -> str:

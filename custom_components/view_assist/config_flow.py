@@ -25,7 +25,6 @@ from .const import (
     CONF_ASSIST_PROMPT,
     CONF_BACKGROUND,
     CONF_DASHBOARD,
-    CONF_DEV_MIMIC,
     CONF_DISPLAY_DEVICE,
     CONF_DO_NOT_DISTURB,
     CONF_FONT_STYLE,
@@ -86,6 +85,7 @@ BASE_SCHEMA = {
 DISPLAY_SCHEMA = {
     vol.Required(CONF_DISPLAY_DEVICE): DeviceSelector(
         DeviceSelectorConfig(
+            multiple=True,
             filter=[
                 EntityFilterSelectorConfig(integration=BROWSERMOD_DOMAIN),
                 EntityFilterSelectorConfig(
@@ -94,7 +94,6 @@ DISPLAY_SCHEMA = {
             ],
         )
     ),
-    vol.Required(CONF_DEV_MIMIC, default=False): bool,
 }
 
 
@@ -221,6 +220,7 @@ class ViewAssistOptionsFlowHandler(OptionsFlow):
                         default=self.config_entry.data[CONF_DISPLAY_DEVICE],
                     ): DeviceSelector(
                         DeviceSelectorConfig(
+                            multiple=True,
                             filter=[
                                 EntityFilterSelectorConfig(
                                     integration=BROWSERMOD_DOMAIN
@@ -231,10 +231,6 @@ class ViewAssistOptionsFlowHandler(OptionsFlow):
                             ],
                         )
                     ),
-                    vol.Required(
-                        CONF_DEV_MIMIC,
-                        default=self.config_entry.data.get(CONF_DEV_MIMIC),
-                    ): bool,
                 }
             )
         else:  # audio_only

@@ -7,6 +7,7 @@ import logging
 from homeassistant.const import CONF_MODE
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.config_validation import ensure_list
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
     async_dispatcher_send,
@@ -79,11 +80,15 @@ class EntityListeners:
             )
         )
 
-    async def _display_revert_delay(self, path: str, timeout: int = 0):
+    async def _display_revert_delay(
+        self, path: str, display_index: int = -1, timeout: int = 0
+    ):
         """Display revert function.  To be called from task."""
         if timeout:
             await asyncio.sleep(timeout)
-            await self.async_browser_navigate(path, is_revert_action=True)
+            await self.async_browser_navigate(
+                path, display_index=display_index, is_revert_action=True
+            )
 
     def _cancel_display_revert_task(self):
         """Cancel any existing revert timer task."""
@@ -97,62 +102,79 @@ class EntityListeners:
 
         Optionally revert to another view after timeout.
         """
+        _LOGGER.debug("NAVIGATE ARGS: %s", args)
         path = args["path"]
-        await self.async_browser_navigate(path)
+        display_index = args.get("display_index")
+        await self.async_browser_navigate(path, display_index)
 
     async def async_browser_navigate(
         self,
         path: str,
+        display_index: int = -1,
         is_revert_action: bool = False,
     ):
         """Navigate browser to defined view.
 
+        Optionally only navigate 1 display device from list with display index
         Optionally revert to another view after timeout.
         """
+
+        _LOGGER.debug(
+            "Navigate called for %s, index %s to %s",
+            self.config_entry.runtime_data.name,
+            display_index,
+            path,
+        )
 
         # If new navigate before revert timer has expired, cancel revert timer.
         if not is_revert_action:
             self._cancel_display_revert_task()
 
+        # Handle list of display devices
+        display_devices = ensure_list(self.config_entry.runtime_data.display_device)
+
+        # If display index is set
+        if display_index != -1:
+            try:
+                display_devices = [display_devices[display_index]]
+                _LOGGER.debug("Navigation limited to display index %s", display_index)
+            except IndexError:
+                pass
+
         # Do navigation and set revert if needed
-        browser_id = get_device_name_from_id(
-            self.hass, self.config_entry.runtime_data.display_device
-        )
-        display_type = get_display_type_from_browser_id(self.hass, browser_id)
+        for index, display_device in enumerate(display_devices):
+            browser_id = get_device_name_from_id(self.hass, display_device)
+            display_type = get_display_type_from_browser_id(self.hass, browser_id)
 
-        _LOGGER.info(
-            "Navigating: %s, browser_id: %s, path: %s, display_type: %s, mode: %s",
-            self.config_entry.runtime_data.name,
-            browser_id,
-            path,
-            display_type,
-            self.config_entry.runtime_data.mode,
-        )
-
-        # If using BrowserMod
-        if display_type == VADisplayType.BROWSERMOD:
-            if not self.browser_or_device_id:
-                self.browser_or_device_id = browser_id
-
-            await self.hass.services.async_call(
-                BROWSERMOD_DOMAIN,
-                "navigate",
-                {"browser_id": self.browser_or_device_id, "path": path},
+            _LOGGER.debug(
+                "Navigating: %s-%s, browser_id: %s, path: %s, display_type: %s, mode: %s",
+                self.config_entry.runtime_data.name,
+                index,
+                browser_id,
+                path,
+                display_type,
+                self.config_entry.runtime_data.mode,
             )
 
-        # If using RAD
-        elif display_type == VADisplayType.REMOTE_ASSIST_DISPLAY:
-            if not self.browser_or_device_id:
+            # If using BrowserMod
+            if display_type == VADisplayType.BROWSERMOD:
+                await self.hass.services.async_call(
+                    BROWSERMOD_DOMAIN,
+                    "navigate",
+                    {"browser_id": browser_id, "path": path},
+                )
+
+            # If using RAD
+            elif display_type == VADisplayType.REMOTE_ASSIST_DISPLAY:
                 device_reg = dr.async_get(self.hass)
                 if device := device_reg.async_get_device(
                     identifiers={(REMOTE_ASSIST_DISPLAY_DOMAIN, browser_id)}
                 ):
-                    self.browser_or_device_id = device.id
-            await self.hass.services.async_call(
-                REMOTE_ASSIST_DISPLAY_DOMAIN,
-                "navigate",
-                {"target": self.browser_or_device_id, "path": path},
-            )
+                    await self.hass.services.async_call(
+                        REMOTE_ASSIST_DISPLAY_DOMAIN,
+                        "navigate",
+                        {"target": device.id, "path": path},
+                    )
 
         # If this was a revert action, end here
         if is_revert_action:
@@ -171,19 +193,19 @@ class EntityListeners:
         # Set revert action if required
         if revert and path != revert_path:
             timeout = self.config_entry.runtime_data.view_timeout
-            _LOGGER.info("Adding revert to %s in %ss", revert_path, timeout)
+            _LOGGER.debug("Adding revert to %s in %ss", revert_path, timeout)
             self.revert_view_task = self.hass.async_create_task(
-                self._display_revert_delay(revert_path, timeout)
+                self._display_revert_delay(revert_path, display_index, timeout)
             )
 
     async def async_cycle_display_view(self, views: list[str]):
         """Cycle display."""
 
         view_index = 0
-        _LOGGER.info("Cycle display started")
+        _LOGGER.debug("Cycle display started")
         while self.config_entry.runtime_data.mode == VAMode.CYCLE:
             view_index = view_index % len(views)
-            _LOGGER.info("Cycling to view: %s", views[view_index])
+            _LOGGER.debug("Cycling to view: %s", views[view_index])
             await self.async_browser_navigate(
                 f"{self.config_entry.runtime_data.dashboard}/{views[view_index]}",
             )

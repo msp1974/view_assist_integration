@@ -22,7 +22,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .alarm_repeater import ALARMS, VAAlarmRepeater
 from .const import (
-    ATTR_DEVICE,
+    ATTR_DISPLAY_INDEX,
     ATTR_DOWNLOAD_IF_MISSING,
     ATTR_EVENT_DATA,
     ATTR_EVENT_NAME,
@@ -47,7 +47,7 @@ from .dashboard import (
     DashboardManagerException,
     DownloadManagerException,
 )
-from .helpers import get_mimic_entity_id, get_random_image
+from .helpers import get_random_image
 from .timers import TIMERS, VATimers, decode_time_sentence
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,9 +55,10 @@ _LOGGER = logging.getLogger(__name__)
 
 NAVIGATE_SERVICE_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_DEVICE): selector.EntitySelector(
+        vol.Required(ATTR_ENTITY_ID): selector.EntitySelector(
             selector.EntitySelectorConfig(integration=DOMAIN)
         ),
+        vol.Optional(ATTR_DISPLAY_INDEX): int,
         vol.Required(ATTR_PATH): str,
     }
 )
@@ -328,7 +329,8 @@ class VAServices:
     async def async_handle_navigate(self, call: ServiceCall):
         """Handle a navigate to view call."""
 
-        va_entity_id = call.data.get(ATTR_DEVICE)
+        va_entity_id = call.data.get(ATTR_ENTITY_ID)
+        display_index = call.data.get(ATTR_DISPLAY_INDEX, -1)
         path = call.data.get(ATTR_PATH)
 
         # get config entry from entity id to allow access to browser_id parameter
@@ -341,7 +343,7 @@ class VAServices:
             async_dispatcher_send(
                 self.hass,
                 f"{DOMAIN}_{entity_config_entry.entry_id}_browser_navigate",
-                {"path": path},
+                {"path": path, "display_index": display_index},
             )
 
     # ----------------------------------------------------------------
@@ -358,15 +360,7 @@ class VAServices:
 
         sentence, timer_info = decode_time_sentence(timer_time)
         if entity_id is None and device_id is None:
-            mimic_device = get_mimic_entity_id(self.hass)
-            if mimic_device:
-                entity_id = mimic_device
-                _LOGGER.warning(
-                    "Using the set mimic entity %s to set timer as no entity or device id provided to the set timer service",
-                    mimic_device,
-                )
-            else:
-                raise vol.InInvalid("entity_id or device_id is required")
+            raise vol.InInvalid("entity_id or device_id is required")
 
         extra_info = {"sentence": sentence}
         if extra_data:

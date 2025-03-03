@@ -11,11 +11,11 @@ import requests
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.config_validation import ensure_list
 from homeassistant.util import datetime
 
 from .const import (
     BROWSERMOD_DOMAIN,
-    CONF_DEV_MIMIC,
     CONF_DISPLAY_DEVICE,
     DOMAIN,
     REMOTE_ASSIST_DISPLAY_DOMAIN,
@@ -60,16 +60,6 @@ def get_loaded_instance_count(hass: HomeAssistant) -> int:
         if not entry.disabled_by
     ]
     return len(entries)
-
-
-def ensure_list(value: str | list[str]):
-    """Ensure that a value is a list."""
-    if isinstance(value, list):
-        return value
-    if isinstance(value, str):
-        value = (value.replace("[", "").replace("]", "").replace('"', "")).split(",")
-        return value if value else []
-    return []
 
 
 def get_entity_attribute(hass: HomeAssistant, entity_id: str, attribute: str) -> Any:
@@ -182,18 +172,6 @@ def get_entity_id_from_conversation_device_id(
     return None
 
 
-def get_mimic_entity_id(hass: HomeAssistant) -> str:
-    """Get mimic entity id."""
-    # If we reach here, no match for browser_id was found
-    if mimic_entry_ids := [
-        entry.entry_id
-        for entry in hass.config_entries.async_entries(DOMAIN)
-        if entry.data.get(CONF_DEV_MIMIC)
-    ]:
-        return get_sensor_entity_from_instance(hass, mimic_entry_ids[0])
-    return None
-
-
 def get_entity_id_by_browser_id(hass: HomeAssistant, browser_id: str) -> str:
     """Get entity id form browser id.
 
@@ -206,13 +184,27 @@ def get_entity_id_by_browser_id(hass: HomeAssistant, browser_id: str) -> str:
         entry_ids = [
             entry.entry_id
             for entry in hass.config_entries.async_entries(DOMAIN)
-            if entry.data.get(CONF_DISPLAY_DEVICE) == device_id
+            if device_id in ensure_list(entry.data.get(CONF_DISPLAY_DEVICE))
         ]
-
         if entry_ids:
             return get_sensor_entity_from_instance(hass, entry_ids[0])
 
     return None
+
+
+def get_display_index(hass: HomeAssistant, entity_id: str, browser_id: str) -> int:
+    """Get display index of browser id on entity."""
+    browser_device_id = get_device_id_from_name(hass, browser_id)
+    entity_config = get_config_entry_by_entity_id(hass, entity_id)
+
+    entity_devices = entity_config.data.get(CONF_DISPLAY_DEVICE)
+    if not isinstance(entity_devices, list):
+        entity_devices = [entity_devices]
+
+    for index, device in enumerate(entity_devices):
+        if device == browser_device_id:
+            return index
+    return -1
 
 
 def get_display_type_from_browser_id(

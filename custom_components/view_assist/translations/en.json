@@ -20,16 +20,14 @@
           "mic_device": "Microphone device",
           "mediaplayer_device": "Media player device",
           "musicplayer_device": "Music player device",
-          "display_device": "Display Device",
-          "dev_mimic": "Mimic for view development"
+          "display_device": "Display Devices"
         },
         "data_description": {
           "name": "The View Assist satellite name",
           "mic_device": "The microphone device for this satellite",
           "mediaplayer_device": "The media player device for this satellite",
           "musicplayer_device": "The music player device for this satellite",
-          "display_device": "The display device for this satellite",
-          "dev_mimic": "Use this device for view development on another machine"
+          "display_device": "The display devices for this satellite"
         }
       }
     }
@@ -53,16 +51,14 @@
           "mic_device": "Microphone device",
           "mediaplayer_device": "Media player device",
           "musicplayer_device": "Music player device",
-          "display_device": "Display Device",
-          "dev_mimic": "Mimic for view development"
+          "display_device": "Display Devices"
         },
         "data_description": {
           "name": "The View Assist satellite name",
           "mic_device": "The microphone device for this satellite",
           "mediaplayer_device": "The media player device for this satellite",
           "musicplayer_device": "The music player device for this satellite",
-          "display_device": "The display device for this satellite",
-          "dev_mimic": "Use this device for view development on another machine"
+          "display_device": "The display devices for this satellite"
         }
       },
       "dashboard_options": {

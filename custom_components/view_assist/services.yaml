@@ -3,15 +3,20 @@ navigate:
   description: >
     Command device to navigate to a certain view
   fields:
-    device:
-      name: Device
+    entity_id:
+      name: View Assist entity
       description: The device to change screen on
-      example: "123434"
       required: true
       selector:
         entity:
           filter:
             integration: view_assist
+    display_index:
+      name: Display index
+      description: The index of the display on this View Assist entity
+      required: false
+      selector:
+        int:
     path:
       name: View Path
       description: Path in dashboard view

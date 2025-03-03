@@ -194,6 +194,7 @@ class ViewAssist {
   constructor(hass) {
     this.hass = hass
     this.va_entity = '';
+    this.display_index = -1;
     this.initializeWhenReady();
   }
 
@@ -210,6 +211,7 @@ class ViewAssist {
       console.info(
         `%cVIEW ASSIST ${version} IS INSTALLED
           %cView Assist Entity: ${this.va_entity}
+          Display Index: ${this.display_index}
           Time Delta: ${window.viewassist_time_delta}`,
           "color: green; font-weight: bold",
           ""
@@ -237,11 +239,14 @@ class ViewAssist {
   }
 
   async set_va_entity() {
-    this.va_entity = await this.hass.callWS({
+    var response = await this.hass.callWS({
       type: 'view_assist/get_entity_id',
       browser_id: localStorage.getItem("browser_mod-browser-id")
     })
+    this.va_entity = response.entity_id
+    this.display_index = response.display_index
     localStorage.setItem("view_assist_sensor", this.va_entity);
+    localStorage.setItem("view_assist_display_index", this.display_index);
 
   }
 
@@ -255,7 +260,7 @@ class ViewAssist {
 }
 
 
-const version = "1.0.1"
+const version = "1.0.2"
 
 // Get the view asssit entity for this browser id and save in local storage
 
