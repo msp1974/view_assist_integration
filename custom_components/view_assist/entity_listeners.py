@@ -745,7 +745,7 @@ class EntityListeners:
 
             # Get changed entities and format for buttons
             changed_entities = get_key("response.data.success", intent_new_state)
-            prefixes = ("light", "switch", "cover", "boolean", "input_boolean")
+            prefixes = ("light", "switch", "cover", "boolean", "input_boolean", "fan")
 
             # Filtering the list based on prefixes
             filtered_list = (

@@ -1,4 +1,4 @@
-const version = "1.0.15"
+const version = "1.0.17"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 export async function await_element(el, hard = false) {
@@ -383,8 +383,9 @@ class ViewAssist {
       // Add custom elements and overlay html
       customElements.define("viewassist-countdown", CountdownTimer)
       customElements.define("viewassist-clock", Clock)
-      await this.add_custom_css();
+
       await this.add_custom_html();
+      await this.add_custom_css();
 
       // Connect to server websocket
       this._hass = await hass();
@@ -574,40 +575,44 @@ class ViewAssist {
   }
 
   async add_custom_css() {
-
-    var linkElement = document.createElement('link');
-    linkElement.setAttribute('rel', 'stylesheet');
-    linkElement.setAttribute('type', 'text/css');
-    linkElement.setAttribute('href', '/view_assist/dashboard/overlay.css');
-    document.head.appendChild(linkElement);
+    // Add custom css to the shadow root
+    var e = await selectTree(
+        document.body,
+        "view-assist-overlays $"
+      );
+    //var e = document.getElementById("view-assist-overlays").shadowRoot;
+    var st = document.createElement("style");
+    const response = await fetch("/view_assist/dashboard/overlay.css");
+    if (!response.ok) {
+      console.error("Overlay HTML not found - no overlays will be displayed");
+      return;
+    }
+    st.innerHTML = await response.text();
+    e.appendChild(st);
   }
 
   async add_custom_html() {
-    var htmlElement = document.createElement('div');
-    htmlElement.id = 'view-assist-overlays';
-    var xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function () {
-      if (this.readyState == 4) {
-        if (this.status == 200) {
-          // Remove html comments form file
-          htmlElement.innerHTML = this.responseText;
-          document.body.appendChild(htmlElement);
-        } else if (this.status == 404) {
-          console.error("Overlay HTML not found - no overlays will be displayed");
-          return;
-        }
-      }
+    var htmlElement = document.createElement('view-assist-overlays');
+    htmlElement.style.display = "block";
+    htmlElement.attachShadow({ mode: "open" });
+    document.body.appendChild(htmlElement);
+
+    const response = await fetch("/view_assist/dashboard/overlay.html");
+    if (!response.ok) {
+      console.error("Overlay HTML not found - no overlays will be displayed");
+      return;
     }
-    xhttp.open("GET", "/view_assist/dashboard/overlay.html", true);
-    xhttp.send();
-    /* Exit the function: */
-    return;
+    htmlElement.shadowRoot.innerHTML = await response.text();
   }
 
   async show_listening_overlay(state, style) {
     // Display listening message
     try {
-      const overlays = document.getElementById("view-assist-overlays");
+      let overlays = await selectTree(
+        document.body,
+        "view-assist-overlays $"
+      );
+      //const overlays = document.getElementsByTagName("view-assist-overlays").shadowRoot;
       const styleDiv = overlays.querySelector(`[id=${style}]`);
 
       const listeningDiv = styleDiv.querySelector(`[id="listening"]`);
