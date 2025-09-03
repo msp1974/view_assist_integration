@@ -1,4 +1,4 @@
-const version = "1.0.17"
+const version = "1.0.18"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 export async function await_element(el, hard = false) {
@@ -260,6 +260,7 @@ class CountdownTimer extends HTMLElement {
 class VAData {
   constructor() {
     this.config;
+    this.wakeDevice;
     this.server_time_delta = 0;
     this.browser_id = '';
   }
@@ -405,6 +406,8 @@ class ViewAssist {
           this.hide_sections();
           this.display_browser_id();
         });
+
+        this.variables.wakeWordDetection = this.sendWakeWordDetected.bind(this);
       }
 
     } catch (e) {
@@ -441,6 +444,13 @@ class ViewAssist {
       localStorage.setItem("view_assist_browser_id", browser_id);
     }
     return localStorage.getItem("view_assist_browser_id");
+  }
+
+  sendWakeWordDetected() {
+    // Send wake word detection to device
+    try {
+      ViewAssistApp.wakeWordDetection()
+    } catch (e) {}
   }
 
   get_browser_id() {
@@ -494,13 +504,10 @@ class ViewAssist {
     // Handle incomming messages from the server
     let event = msg["event"];
     let payload = msg["payload"];
-    //console.log("Event: " + event + ", Payload: " + JSON.stringify(payload))
-    if (event == "connection" || event == "config_update") {
+    console.log("Event: " + event + ", Payload: " + JSON.stringify(payload))
+    if (event == "connection" || event == "config_update" || event == "registered") {
       localStorage.setItem("view_assist_status", "registered");
       this.process_config(event, payload);
-    }
-    else if (event == "registered") {
-      location.reload();
     }
     else if (event == "timer_update") {
       this.variables.config.timers = payload
