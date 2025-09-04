@@ -356,17 +356,25 @@ class ViewAssist {
         browserId.id = "view_assist_browser_id";
         browserId.attachShadow({ mode: "open" });
         const vadiv = document.createElement("p");
-        vadiv.innerHTML = this.get_browser_id();
+        vadiv.innerHTML = "Register this display in View Assist with below display ID</br></br>" + this.get_browser_id();
         browserId.shadowRoot.appendChild(vadiv);
         const styleEl = document.createElement("style");
         browserId.shadowRoot.append(styleEl);
         styleEl.innerHTML = (
           `:host {
-            position: fixed;
-            right: 1vw;
-            bottom: 0vh;
-            font-size: 5vh;
+            position: absolute;
+            left: 10vw;
+            top: 30vh;
+            font-size: 6vh;
             color: white;
+            background-color: rgba(0,0,0,0.9);
+            z-index: 100;
+            padding: 0 5vw;
+            border: 4px solid #5C82A7; */
+            margin: auto;
+            justify-content: center;
+            width: 70vw;
+            text-align: center;
           }`
         );
       }
@@ -505,7 +513,10 @@ class ViewAssist {
     let event = msg["event"];
     let payload = msg["payload"];
     console.log("Event: " + event + ", Payload: " + JSON.stringify(payload))
-    if (event == "connection" || event == "config_update" || event == "registered") {
+    if (event == "connection" || event == "config_update") {
+      this.process_config(event, payload);
+    }
+    else if (event == "registered") {
       localStorage.setItem("view_assist_status", "registered");
       this.process_config(event, payload);
     }
@@ -522,8 +533,10 @@ class ViewAssist {
         localStorage.removeItem("view_assist_mimic_device");
       }
       this.variables.config = {}
-      this.hide_sections();
-      localStorage.setItem("view_assist_status", "unregistered");
+      this.hide_sections(false);
+      if (localStorage.getItem("view_assist_status") == "registered") {
+        localStorage.setItem("view_assist_status", "unregistered");
+      }
       this.display_browser_id();
     }
     else if (event == "listening") {
