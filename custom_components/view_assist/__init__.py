@@ -446,4 +446,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: VAConfigEntry):
         await hass.config_entries.async_unload_platforms(entry, [Platform.UPDATE])
         return True
 
+    # Tell device to unregister
+    async_dispatcher_send(
+        hass,
+        f"{DOMAIN}_{entry.entry_id}_event",
+        VAEvent("unregistered"),
+    )
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
