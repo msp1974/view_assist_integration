@@ -8,7 +8,9 @@ import random
 
 from awesomeversion import AwesomeVersion
 
-from homeassistant.components.assist_satellite.entity import AssistSatelliteState
+from homeassistant.components.assist_satellite.entity import (
+    AssistSatelliteState,  # pylint: disable=hass-component-root-import
+)
 from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_MODE
@@ -19,7 +21,6 @@ from homeassistant.core import (
     State,
     callback,
 )
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
     async_dispatcher_send,
@@ -29,7 +30,6 @@ from homeassistant.helpers.start import async_at_started
 
 from .assets import ASSETS_MANAGER, AssetClass, AssetsManager
 from .const import (
-    BROWSERMOD_DOMAIN,
     CC_CONVERSATION_ENDED_EVENT,
     CONF_DO_NOT_DISTURB,
     CYCLE_VIEWS,
@@ -37,8 +37,6 @@ from .const import (
     DOMAIN,
     HASSMIC_DOMAIN,
     MIN_DASHBOARD_FOR_OVERLAYS,
-    REMOTE_ASSIST_DISPLAY_DOMAIN,
-    USE_VA_NAVIGATION_FOR_BROWSERMOD,
     VA_ATTRIBUTE_UPDATE_EVENT,
     VA_BACKGROUND_UPDATE_EVENT,
     VACA_DOMAIN,
@@ -49,7 +47,6 @@ from .helpers import (
     async_get_filesystem_images,
     get_config_entry_by_entity_id,
     get_device_name_from_id,
-    get_display_type_from_browser_id,
     get_entity_attribute,
     get_entity_id_from_conversation_device_id,
     get_hassmic_pipeline_status_entity_id,
@@ -58,7 +55,7 @@ from .helpers import (
     get_revert_settings_for_mode,
     get_sensor_entity_from_instance,
 )
-from .typed import VABackgroundMode, VAConfigEntry, VADisplayType, VAEvent
+from .typed import VABackgroundMode, VAConfigEntry, VAEvent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -282,57 +279,20 @@ class EntityListeners:
         browser_id = get_device_name_from_id(
             self.hass, self.config_entry.runtime_data.core.display_device
         )
-        display_type = get_display_type_from_browser_id(self.hass, browser_id)
 
         _LOGGER.debug(
-            "Navigating: %s, browser_id: %s, path: %s, display_type: %s, mode: %s",
+            "Navigating: %s, browser_id: %s, path: %s, mode: %s",
             self.config_entry.runtime_data.core.name,
             browser_id,
             path,
-            display_type,
             self.config_entry.runtime_data.default.mode,
         )
 
-        # If using BrowserMod
-        if display_type == VADisplayType.BROWSERMOD:
-            if not self.browser_or_device_id:
-                self.browser_or_device_id = browser_id
-
-            if USE_VA_NAVIGATION_FOR_BROWSERMOD:
-                # Use own VA navigation
-                async_dispatcher_send(
-                    self.hass,
-                    f"{DOMAIN}_{self.config_entry.entry_id}_event",
-                    VAEvent("navigate", {"path": path}),
-                )
-            else:
-                await self.hass.services.async_call(
-                    BROWSERMOD_DOMAIN,
-                    "navigate",
-                    {"browser_id": self.browser_or_device_id, "path": path},
-                )
-
-        # If using RAD
-        elif display_type == VADisplayType.REMOTE_ASSIST_DISPLAY:
-            if not self.browser_or_device_id:
-                device_reg = dr.async_get(self.hass)
-                if device := device_reg.async_get_device(
-                    identifiers={(REMOTE_ASSIST_DISPLAY_DOMAIN, browser_id)}
-                ):
-                    self.browser_or_device_id = device.id
-            await self.hass.services.async_call(
-                REMOTE_ASSIST_DISPLAY_DOMAIN,
-                "navigate",
-                {"target": self.browser_or_device_id, "path": path},
-            )
-
-        else:
-            # Use own VA navigation
-            async_dispatcher_send(
-                self.hass,
-                f"{DOMAIN}_{self.config_entry.entry_id}_event",
-                VAEvent("navigate", {"path": path}),
-            )
+        async_dispatcher_send(
+            self.hass,
+            f"{DOMAIN}_{self.config_entry.entry_id}_event",
+            VAEvent("navigate", {"path": path}),
+        )
 
         # If this was a revert action, end here
         if is_revert_action:

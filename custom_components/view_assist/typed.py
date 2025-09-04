@@ -50,13 +50,6 @@ class VAIconSizes(StrEnum):
     LARGE = "8vw"
 
 
-class VADisplayType(StrEnum):
-    """Display types."""
-
-    BROWSERMOD = "browser_mod"
-    REMOTE_ASSIST_DISPLAY = "remote_assist_display"
-
-
 class VABackgroundMode(StrEnum):
     """Background mode enum."""
 

@@ -1,11 +1,11 @@
 """Helper functions."""
 
-from bs4 import BeautifulSoup
 from functools import reduce
 import logging
 from pathlib import Path
 from typing import Any
 
+from bs4 import BeautifulSoup
 import requests
 
 from homeassistant.const import CONF_TYPE, Platform
@@ -26,7 +26,7 @@ from .const import (
     VAMODE_REVERTS,
     VAMode,
 )
-from .typed import VAConfigEntry, VADisplayType, VAType
+from .typed import VAConfigEntry, VAType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -288,18 +288,7 @@ def get_mimic_entity_id(hass: HomeAssistant, browser_id: str | None = None) -> s
     # If we reach here, no match for browser_id was found
     master_entry = get_master_config_entry(hass)
     if browser_id:
-        if get_display_type_from_browser_id(hass, browser_id) == "native":
-            if (
-                master_entry.runtime_data.developer_settings.developer_device
-                == browser_id
-            ):
-                return (
-                    master_entry.runtime_data.developer_settings.developer_mimic_device
-                )
-            return None
-
-        device_id = get_device_id_from_name(hass, browser_id)
-        if master_entry.runtime_data.developer_settings.developer_device == device_id:
+        if master_entry.runtime_data.developer_settings.developer_device == browser_id:
             return master_entry.runtime_data.developer_settings.developer_mimic_device
         return None
     return master_entry.runtime_data.developer_settings.developer_mimic_device
@@ -361,24 +350,6 @@ def get_hassmic_pipeline_status_entity_id(
             ):
                 return entity.entity_id
     return None
-
-
-def get_display_type_from_browser_id(
-    hass: HomeAssistant, browser_id: str
-) -> VADisplayType:
-    """Return VAType from a browser id."""
-    device_id = get_device_id_from_name(hass, browser_id)
-    if device_id:
-        device_reg = dr.async_get(hass)
-        device = device_reg.async_get(device_id)
-
-        entry = hass.config_entries.async_get_entry(device.primary_config_entry)
-        if entry:
-            if entry.domain == BROWSERMOD_DOMAIN:
-                return VADisplayType.BROWSERMOD
-            if entry.domain == REMOTE_ASSIST_DISPLAY_DOMAIN:
-                return VADisplayType.REMOTE_ASSIST_DISPLAY
-    return "native"
 
 
 def get_revert_settings_for_mode(mode: VAMode) -> tuple:
