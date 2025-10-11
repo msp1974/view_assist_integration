@@ -266,7 +266,7 @@ class BlueprintManager(BaseAssetManager):
         """Copy a file to a directory."""
         try:
             dest_file.parent.mkdir(parents=True, exist_ok=True)
-            with Path.open(dest_file, "wb") as f:
+            with Path.open(dest_file, "wb", encoding="utf-8") as f:
                 f.write(source_file.read_bytes())
         except OSError as ex:
             raise AssetManagerException(
