@@ -1,16 +1,17 @@
 """Handlers alarm repeater."""
 
+from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass
 import io
 import logging
-import math
 import time
 from typing import Any
-import voluptuous as vol
 
 import mutagen
 import requests
+import voluptuous as vol
 
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
@@ -25,7 +26,7 @@ from homeassistant.helpers import entity, selector
 from homeassistant.helpers.entity_component import DATA_INSTANCES, EntityComponent
 from homeassistant.helpers.network import get_url
 
-from .const import (
+from ..const import (  # noqa: TID252
     ATTR_MAX_REPEATS,
     ATTR_MEDIA_FILE,
     ATTR_RESUME_MEDIA,
@@ -69,8 +70,13 @@ class PlayingMedia:
     queue: Any | None = None
 
 
-class VAAlarmRepeater:
+class AlarmRepeater:
     """Class to handle announcing on media player with resume."""
+
+    @classmethod
+    def get(cls, hass: HomeAssistant) -> AlarmRepeater | None:
+        """Get the alarm repeater instance."""
+        return hass.data[DOMAIN][cls.__name__]
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Initialise."""
@@ -80,6 +86,9 @@ class VAAlarmRepeater:
         self.alarm_tasks: dict[str, asyncio.Task] = {}
 
         self.announcement_in_progress: bool = False
+
+    async def async_setup(self) -> bool:
+        """Start the alarm repeater."""
 
         self.hass.services.async_register(
             DOMAIN,
@@ -94,6 +103,15 @@ class VAAlarmRepeater:
             self._async_handle_stop_alarm_sound,
             schema=STOP_ALARM_SOUND_SERVICE_SCHEMA,
         )
+
+        return True
+
+    async def async_unload(self) -> bool:
+        """Stop the alarm repeater."""
+        await self.cancel_alarm_sound()
+        self.hass.services.async_remove(DOMAIN, "sound_alarm")
+        self.hass.services.async_remove(DOMAIN, "cancel_sound_alarm")
+        return True
 
     async def _async_handle_alarm_sound(self, call: ServiceCall) -> ServiceResponse:
         """Handle alarm sound."""

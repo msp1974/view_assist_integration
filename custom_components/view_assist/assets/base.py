@@ -3,11 +3,11 @@
 from dataclasses import dataclass
 from typing import Any
 
+from config.custom_components.view_assist.const import VA_ASSET_UPDATE_PROGRESS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from ..const import VA_ASSET_UPDATE_PROGRESS  # noqa: TID252
-from ..typed import VAConfigEntry  # noqa: TID252
+from . import VAConfigEntry
 from .download_manager import DownloadManager
 
 
@@ -58,7 +58,9 @@ class BaseAssetManager:
         """Get latest version of asset from repo."""
         raise NotImplementedError
 
-    async def async_get_version_info(self) -> dict[str, Any]:
+    async def async_get_version_info(
+        self, update_from_repo: bool = True
+    ) -> dict[str, Any]:
         """Update versions from repo."""
         raise NotImplementedError
 

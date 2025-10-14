@@ -1,13 +1,15 @@
 """Handles HTTP functions."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, URL_BASE, VA_SUB_DIRS
-from .typed import VAConfigEntry
+from ..const import DOMAIN, URL_BASE, VA_SUB_DIRS  # noqa: TID252
+from ..typed import VAConfigEntry  # noqa: TID252
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,6 +21,16 @@ class HTTPManager:
         """Initialise."""
         self.hass = hass
         self.config = config
+
+    async def async_setup(self) -> bool:
+        """Set up the HTTP Manager."""
+        await self.create_url_paths()
+        return True
+
+    async def async_unload(self) -> bool:
+        """Unload the HTTP Manager."""
+        # Currently nothing to unload
+        return True
 
     async def _async_register_path(self, url: str, path: str):
         """Register resource path if not already registered."""

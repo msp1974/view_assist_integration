@@ -13,15 +13,9 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .assets import (
-    ASSETS_MANAGER,
-    VA_ADD_UPDATE_ENTITY_EVENT,
-    AssetClass,
-    AssetsManager,
-)
+from .assets import VA_ADD_UPDATE_ENTITY_EVENT, AssetClass, AssetsManager
 from .assets.base import AssetManagerException
 from .const import (
-    BLUEPRINT_GITHUB_PATH,
     DASHBOARD_DIR,
     DASHBOARD_VIEWS_GITHUB_PATH,
     DOMAIN,
@@ -40,7 +34,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: VAConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up update platform."""
-    am: AssetsManager = hass.data[DOMAIN][ASSETS_MANAGER]
+    am = AssetsManager.get(hass)
 
     async def async_add_remove_update_entity(
         data: dict[str, Any], startup: bool = False
@@ -90,7 +84,7 @@ async def async_setup_entry(
                 {
                     "asset_class": asset_class,
                     "name": name,
-                    "remove": not installed or AwesomeVersion(installed) >= latest,
+                    "remove": installed and AwesomeVersion(installed) >= latest,
                 },
                 startup=True,
             )
@@ -151,7 +145,8 @@ class VAUpdateEntity(UpdateEntity):
     @property
     def installed_version(self) -> str:
         """Return downloaded version of the entity."""
-        return self.am.store.data[self._asset_class][self._name]["installed"]
+        installed = self.am.store.data[self._asset_class][self._name]["installed"]
+        return installed or "Not installed"
 
     @property
     def release_summary(self) -> str | None:
