@@ -74,11 +74,13 @@ class DeviceManager:
         # Check if this is the first entry being loaded
         is_first_entry = len(self.hass.data[DOMAIN].get(DEVICES, {})) == 0
 
-        # Define module to load
-        modules = ALL_DEVICE_MODULES.copy()
+        # Define modules to load
+        modules = []
 
         if self.config.runtime_data.core.type in DISPLAY_DEVICE_TYPES:
             modules += VIEW_DEVICE_MODULES
+
+        modules += ALL_DEVICE_MODULES
 
         # Load modules
         loading_tasks = set()
