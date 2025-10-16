@@ -12,12 +12,12 @@ import contextlib
 import logging
 from typing import Any
 
-from config.custom_components.view_assist.helpers import get_master_config_entry
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from ..const import DEVICES, DOMAIN, PLATFORMS  # noqa: TID252
+from ..helpers import get_master_config_entry  # noqa: TID252
 from ..typed import (  # noqa: TID252
     DISPLAY_DEVICE_TYPES,
     VAConfigEntry,

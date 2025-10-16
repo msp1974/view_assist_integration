@@ -1,6 +1,7 @@
 """Init file for translator module."""
 
 from __future__ import annotations
+
 from typing import Any
 
 from homeassistant.components import conversation
