@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 from typing import Any
 
-from config.custom_components.view_assist.const import VA_ASSET_UPDATE_PROGRESS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+from ..const import VA_ASSET_UPDATE_PROGRESS  # noqa: TID252
 from . import VAConfigEntry
 from .download_manager import DownloadManager
 
