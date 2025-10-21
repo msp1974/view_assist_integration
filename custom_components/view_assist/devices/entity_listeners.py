@@ -527,6 +527,7 @@ class EntityStateChangedHandler:
             _LOGGER.debug("Intent output received: %s", speech_text)
             # Set updates to apply to sensor entity
             updates = {}
+            processed_locally = new_state.attributes.get("processed_locally", False)
             navigation_manager = NavigationManager.get(self.hass, self.config)
 
             # Add speech text to sensor entity
@@ -545,7 +546,6 @@ class EntityStateChangedHandler:
                 )
 
                 # Establish changes
-                processed_locally = new_state.attributes.get("processed_locally", False)
                 entities = [
                     item["id"]
                     for item in changed_entities
@@ -583,24 +583,22 @@ class EntityStateChangedHandler:
                         navigation_manager.browser_navigate(
                             self.config.runtime_data.dashboard.list_view
                         )
-                elif not processed_locally:
-                    _LOGGER.debug("No entities or todo lists affected")
-                    word_count = len(speech_text.split())
-                    message_font_size = ["10vw", "8vw", "6vw", "4vw"][
-                        min(word_count // 6, 3)
-                    ]
-                    updates.update(
-                        {
-                            "title": "AI Response",
-                            "message_font_size": message_font_size,
-                            "message": speech_text,
-                        }
-                    )
-                    self._update_sensor_entity(updates)
-                    if navigation_manager:
-                        navigation_manager.browser_navigate(
-                            self.config.runtime_data.dashboard.intent
-                        )
+            elif not processed_locally:
+                _LOGGER.debug("No entities or todo lists affected")
+                word_count = len(speech_text.split())
+                message_font_size = ["10vw", "8vw", "6vw", "4vw"][
+                    min(word_count // 6, 3)
+                ]
+                updates.update(
+                    {
+                        "title": "AI Response",
+                        "message_font_size": message_font_size,
+                        "message": speech_text,
+                    }
+                )
+                self._update_sensor_entity(updates)
+                if navigation_manager:
+                    navigation_manager.browser_navigate("view-assist/info")
 
     @callback
     def _async_cc_on_conversation_ended_handler(self, event: Event):
