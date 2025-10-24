@@ -138,9 +138,22 @@ def get_formatted_time(timer_dt: dt.datetime, h24format: bool = False) -> str:
     return timer_dt.strftime("%-I:%M %p")
 
 
+def get_named_day(timer_dt: dt.datetime, dt_now: dt.datetime) -> str:
+    """Return a named day or date."""
+    days_diff = timer_dt.day - dt_now.day
+    if days_diff == 0:
+        return "Today"
+    if days_diff == 1:
+        return "Tomorrow"
+    if days_diff < 7:
+        return timer_dt.strftime("%A")
+    return timer_dt.strftime("%-d %B")
+
+
 def encode_datetime_to_human(
     timer_type: str,
     timer_dt: dt.datetime,
+    tz: zoneinfo.ZoneInfo,
     h24format: bool = False,
 ) -> str:
     """Encode datetime into human speech sentence."""
@@ -150,11 +163,11 @@ def encode_datetime_to_human(
             return f"{term}s"
         return term
 
-    dt_now = dt.datetime.now()
+    dt_now = dt.datetime.now(tz=tz)
     delta = timer_dt - dt_now
     delta_s = math.ceil(delta.total_seconds())
 
-    if timer_type == "TimerInterval":
+    if timer_type == "interval":
         minutes, seconds = divmod(delta_s, 60)
         hours, minutes = divmod(minutes, 60)
         days, hours = divmod(hours, 24)
@@ -179,9 +192,9 @@ def encode_datetime_to_human(
 
         return duration.strip()
 
-    if timer_type == "TimerTime":
+    if timer_type == "time":
         # do date bit - today, tomorrow, day of week if in next 7 days, date
-        output_date = dt_now  # get_named_day(timer_dt, dt_now)
+        output_date = get_named_day(timer_dt, dt_now)
         output_time = get_formatted_time(timer_dt, h24format)
         return f"{output_date} at {output_time}"
 
@@ -443,8 +456,8 @@ class TimerManager:
                 )
 
             # Set timer status
-            if timer.status == TimerStatus.SNOOZED:
-                return
+            # if timer.status == TimerStatus.SNOOZED:
+            #    return
 
             if timer.status != TimerStatus.RUNNING:
                 await self.store.update_status(timer.id, TimerStatus.RUNNING)
@@ -453,7 +466,9 @@ class TimerManager:
                 # existing timer restarted after HA restart
                 await self._fire_event(timer.id, TimerEvent.STARTED)
 
-    async def snooze_timer(self, timer_id: str, duration: Any):
+    async def snooze_timer(
+        self, timer_id: str, timer_info: TimerInfo
+    ) -> tuple[str | None, Timer | None, str]:
         """Snooze expired timer.
 
         This will set the timer expire to now plus duration on an expired timer
@@ -461,23 +476,33 @@ class TimerManager:
         """
         timer = self.store.timers.get(timer_id)
         if timer and timer.status == TimerStatus.EXPIRED:
-            expiry = dt.datetime.now() + dt.timedelta(seconds=duration)
+            expiry = dt.datetime.now() + dt.timedelta(
+                hours=timer_info.hours,
+                minutes=timer_info.minutes,
+                seconds=timer_info.seconds,
+            )
             timer.expires_at = time.mktime(expiry.timetuple())
-            timer.extra_info["snooze_duration"] = duration
+            timer.extra_info["snooze_duration"] = timer_info.sentence
             await self.store.update_status(timer_id, TimerStatus.SNOOZED)
-            await self.start_timer(timer_id, timer)
+            await self.start_timer(timer)
             await self._fire_event(timer_id, TimerEvent.SNOOZED)
 
-            encoded_duration = encode_datetime_to_human("TimerInterval", expiry)
+            # encoded_duration = encode_datetime_to_human(
+            #    "TimerInterval", expiry, self.tz
+            # )
 
-            return timer_id, timer.to_dict(), encoded_duration
-        return None, None, "unable to snooze"
+            return (
+                "timer_named_snoozed" if timer.name else "timer_snoozed",
+                self.format_timer_output(timer),
+            )
+        return "timer_error", self.format_timer_output(timer) if timer else None
 
     async def cancel_timer(
         self,
         timer_id: str | None = None,
         device_or_entity_id: str | None = None,
         cancel_all: bool = False,
+        just_expired: bool = False,
     ) -> bool:
         """Cancel timer by timer id, device id or all."""
         if timer_id:
@@ -496,6 +521,11 @@ class TimerManager:
 
         if timer_ids:
             for timerid in timer_ids:
+                if (
+                    just_expired
+                    and self.store.timers[timerid].status != TimerStatus.EXPIRED
+                ):
+                    continue
                 if await self.store.cancel_timer(timerid):
                     _LOGGER.debug("Cancelled timer: %s", timerid)
                     if timer_task := self.timer_tasks.pop(timerid, None):
@@ -692,9 +722,29 @@ class TimerManager:
         def dynamic_remaining(timer_type: TimerClass, expires_at: int) -> str:
             """Generate dynamic name."""
             return encode_datetime_to_human(
-                timer_type,
-                dt.datetime.fromtimestamp(expires_at),
+                timer_type, dt.datetime.fromtimestamp(expires_at, self.tz), self.tz
             )
+
+        def speak_remaining(timer: Timer) -> str:
+            """Generate speech status."""
+
+            # Generate name and class
+            name_class = timer.timer_class
+            if timer.name:
+                name_class = f"{timer.name} {name_class}"
+            elif timer.timer_type == "interval":
+                name_class = f"{timer.extra_info.get('sentence')} {name_class}"
+
+            output = (
+                f"{'an' if name_class[0].lower() in 'aeiou' else 'a'} {name_class} "
+            )
+
+            if timer.timer_type == "time":
+                output += f"for {dynamic_remaining(timer.timer_type, timer.expires_at)}"
+            elif timer.timer_type == "interval":
+                output += f"with {dynamic_remaining(timer.timer_type, timer.expires_at)} remaining"
+
+            return output.strip()
 
         # dt_now = dt.datetime.now(self.tz)
         dt_expiry = dt.datetime.fromtimestamp(timer.expires_at, self.tz)
@@ -715,7 +765,9 @@ class TimerManager:
                 "interval": expires_in_interval(timer.expires_at),
                 # "day": get_named_day(dt_expiry, dt_now),
                 "time": get_formatted_time(dt_expiry),
+                "day": get_named_day(dt_expiry, dt.datetime.now(self.tz)),
                 "text": dynamic_remaining(timer.timer_type, timer.expires_at),
+                "speak": speak_remaining(timer),
             },
             "created_at": dt.datetime.fromtimestamp(timer.created_at, self.tz),
             "updated_at": dt.datetime.fromtimestamp(timer.updated_at, self.tz),
@@ -766,6 +818,8 @@ class TimerManager:
 class TimerManagerServices:
     """Class to hold timer manager service names."""
 
+    ATTR_JUST_EXPIRED = "just_expired"
+
     SET_TIMER_SERVICE_SCHEMA = vol.Schema(
         {
             vol.Exclusive(ATTR_ENTITY_ID, "target"): cv.entity_id,
@@ -784,6 +838,7 @@ class TimerManagerServices:
             vol.Exclusive(ATTR_ENTITY_ID, "target"): cv.entity_id,
             vol.Exclusive(ATTR_DEVICE_ID, "target"): vol.Any(cv.string, None),
             vol.Exclusive(ATTR_REMOVE_ALL, "target"): bool,
+            vol.Optional(ATTR_JUST_EXPIRED): bool,
         }
     )
 
@@ -883,6 +938,7 @@ class TimerManagerServices:
                 "name": timer["name"],
                 f"time_{language}": timer["extra_info"].get("sentence", ""),
                 "time_en": get_key("timer_info.sentence", timer["extra_info"]),
+                "snooze_duration": timer["extra_info"].get("snooze_duration", ""),
             }
         return await translator.translate_time_response(response_id, params, language)
 
@@ -951,18 +1007,32 @@ class TimerManagerServices:
         """Handle a set timer service call."""
         timer_id = call.data.get(ATTR_TIMER_ID)
         timer_time = call.data.get(ATTR_TIME)
+        language = call.data.get(ATTR_LANGUAGE, "en")
 
-        _, timer_info = self.decode_time_sentence(timer_time)
+        _, timer_info = await self.decode_time_sentence(
+            timer_time, language=language, time_type="interval"
+        )
+
+        if not timer_info:
+            response = await self.create_response("timer_error", language=language)
+            return {"response": response}
 
         if timer_info:
             tm = TimerManager.get(self.hass)
-            timer_id, timer, response = await tm.snooze_timer(
+            response_id, timer = await tm.snooze_timer(
                 timer_id,
                 timer_info,
             )
 
-            return {"timer_id": timer_id, "timer": timer, "response": response}
-        return {"error": "unable to decode time or interval information"}
+            response = await self.create_response(response_id, timer, language)
+            _LOGGER.debug("Set timer response: %s", response)
+            return {
+                "timer_id": timer["id"] if timer else None,
+                "timer": timer if timer else None,
+                "response": response,
+            }
+        response = await self.create_response("timer_error", language=language)
+        return {"response": response}
 
     async def _async_handle_cancel_timer(self, call: ServiceCall) -> ServiceResponse:
         """Handle a cancel timer service call."""
@@ -970,6 +1040,7 @@ class TimerManagerServices:
         entity_id = call.data.get(ATTR_ENTITY_ID)
         device_id = call.data.get(ATTR_DEVICE_ID)
         cancel_all = call.data.get(ATTR_REMOVE_ALL, False)
+        just_expired = call.data.get(self.ATTR_JUST_EXPIRED, False)
 
         if any([timer_id, entity_id, device_id, cancel_all]):
             tm = TimerManager.get(self.hass)
@@ -977,6 +1048,7 @@ class TimerManagerServices:
                 timer_id=timer_id,
                 device_or_entity_id=entity_id if entity_id else device_id,
                 cancel_all=cancel_all,
+                just_expired=just_expired,
             )
             return {"result": result}
         return {"error": "no attribute supplied"}

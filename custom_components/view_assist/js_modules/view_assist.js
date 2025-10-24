@@ -1,6 +1,6 @@
-import { timerCards } from "./timers.js";
+import { timerCards } from "./timers.js?v=1.0.20";
 
-const version = "1.0.19"
+const version = "1.0.20"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 export async function await_element(el, hard = false) {
@@ -304,7 +304,20 @@ class ViewAssistHelpers {
   }
 
   timerCards(show_all = false) {
-    return timerCards.timerCards(show_all);
+    const timerCount = window.viewassist.config.timers.length;
+    if (timerCount == 0) return timerCards.noTimersCard();
+
+    if (timerCount > 1) {
+      //const entity_id = localStorage.getItem("view_assist_sensor");
+      //const expired_timers = window.viewassist.config?.timers.filter(t => t.status === 'expired');
+      //console.log("Expired timers: ", expired_timers);
+      //if (expired_timers.length > 0 && !show_all) {
+      //  return timerCards.singleTimerCard(expired_timers[0].id);
+      // }
+      return timerCards.timerCards(show_all);
+    } else {
+      return timerCards.singleTimerCard(window.viewassist.config.timers[0].id);
+    }
   }
 
   validateRequirements(requirements) {
