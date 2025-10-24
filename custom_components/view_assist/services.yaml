@@ -150,6 +150,12 @@ get_timers:
       required: false
       selector:
         text:
+    include_expired:
+      name: "Include expired"
+      description: "Whether to include expired timers in the results"
+      required: false
+      selector:
+        boolean:
 snooze_timer:
   name: Snooze a timer
   description: Snooze an expired timer for a certain time

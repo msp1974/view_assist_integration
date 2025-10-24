@@ -13,6 +13,7 @@ import mutagen
 import requests
 import voluptuous as vol
 
+from config.custom_components.view_assist.core.timers import TimerManager
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -30,6 +31,7 @@ from ..const import (  # noqa: TID252
     ATTR_MAX_REPEATS,
     ATTR_MEDIA_FILE,
     ATTR_RESUME_MEDIA,
+    ATTR_TIMER_ID,
     BROWSERMOD_DOMAIN,
     DOMAIN,
 )
@@ -51,9 +53,10 @@ ALARM_SOUND_SERVICE_SCHEMA = vol.Schema(
 
 STOP_ALARM_SOUND_SERVICE_SCHEMA = vol.Schema(
     {
-        vol.Optional(ATTR_ENTITY_ID): selector.EntitySelector(
+        vol.Required(ATTR_ENTITY_ID): selector.EntitySelector(
             selector.EntitySelectorConfig(integration=DOMAIN)
         ),
+        vol.Optional(ATTR_TIMER_ID): str,
     }
 )
 
@@ -127,7 +130,8 @@ class AlarmRepeater:
     async def _async_handle_stop_alarm_sound(self, call: ServiceCall):
         """Handle stop alarm sound."""
         entity_id = call.data.get(ATTR_ENTITY_ID)
-        await self.cancel_alarm_sound(entity_id)
+        timer_id = call.data.get(ATTR_TIMER_ID)
+        await self.cancel_alarm_sound(entity_id, timer_id)
 
     def _get_entity_from_entity_id(self, entity_id: str):
         """Get entity object from entity_id."""
@@ -424,7 +428,9 @@ class AlarmRepeater:
                     pass
         return {}
 
-    async def cancel_alarm_sound(self, entity_id: str | None = None):
+    async def cancel_alarm_sound(
+        self, entity_id: str | None = None, timer_id: str | None = None
+    ):
         """Cancel announcement."""
         if entity_id:
             entities = [entity_id]
@@ -444,3 +450,10 @@ class AlarmRepeater:
                     )
                 self.alarm_tasks[mp_entity_id].cancel()
                 _LOGGER.debug("Alarm sound cancelled")
+
+        # Cancel timer if timer_id provided
+        if timer_id:
+            tm = TimerManager.get(self.hass)
+            if tm:
+                await tm.cancel_timer(timer_id)
+                _LOGGER.debug("Cancelled timer %s", timer_id)

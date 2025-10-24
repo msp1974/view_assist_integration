@@ -128,6 +128,10 @@ class NavigationManager:
         if is_revert_action:
             return
 
+        # If timeout set to 0, do not revert
+        if timeout == 0:
+            return
+
         # Find required revert action
         revert, revert_view = get_revert_settings_for_mode(
             self.config.runtime_data.default.mode
