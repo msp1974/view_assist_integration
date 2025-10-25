@@ -13,7 +13,6 @@ import mutagen
 import requests
 import voluptuous as vol
 
-from config.custom_components.view_assist.core.timers import TimerManager
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -35,6 +34,7 @@ from ..const import (  # noqa: TID252
     BROWSERMOD_DOMAIN,
     DOMAIN,
 )
+from .timers import TimerManager
 
 _LOGGER = logging.getLogger(__name__)
 
