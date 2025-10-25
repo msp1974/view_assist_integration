@@ -42,7 +42,6 @@ from ..const import (  # noqa: TID252
 )
 from ..helpers import (  # noqa: TID252
     get_entity_id_from_conversation_device_id,
-    get_key,
     get_mimic_entity_id,
 )
 from ..typed import VAEvent, VAEventType  # noqa: TID252
@@ -937,7 +936,7 @@ class TimerManagerServices:
             params = {
                 "name": timer["name"],
                 f"time_{language}": timer["extra_info"].get("sentence", ""),
-                "time_en": get_key("timer_info.sentence", timer["extra_info"]),
+                "time_en": timer["extra_info"].get("sentence", ""),
                 "snooze_duration": timer["extra_info"].get("snooze_duration", ""),
             }
         return await translator.translate_time_response(response_id, params, language)
