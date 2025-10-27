@@ -165,6 +165,31 @@ def get_devices_for_domain(hass: HomeAssistant, domain: str) -> list[dr.DeviceEn
     return []
 
 
+def get_mic_device_domain(hass: HomeAssistant, entity_id: str) -> str | None:
+    """Get the mic device domain of an entity by id."""
+    entity_registry = er.async_get(hass)
+    if va_entity := entity_registry.async_get(entity_id):
+        va_entry = hass.config_entries.async_get_entry(va_entity.config_entry_id)
+        if mic_entity := va_entry.data.get("mic_device"):
+            mic_entity_entry = entity_registry.async_get(mic_entity)
+            if mic_entity_entry:
+                entry_id = mic_entity_entry.config_entry_id
+                entry = hass.config_entries.async_get_entry(entry_id)
+                if entry:
+                    return entry.domain
+    return None
+
+
+def get_mic_device_id_from_entity_id(hass: HomeAssistant, entity_id: str) -> str | None:
+    """Get the mic device id of an entity by id."""
+    entity_registry = er.async_get(hass)
+    if va_entity := entity_registry.async_get(entity_id):
+        va_entry = hass.config_entries.async_get_entry(va_entity.config_entry_id)
+        if mic_entity := va_entry.data.get("mic_device"):
+            return entity_registry.async_get(mic_entity).device_id
+    return None
+
+
 def get_device_id_from_name(hass: HomeAssistant, device_name: str) -> str:
     """Get the device id of the device with the given name."""
 

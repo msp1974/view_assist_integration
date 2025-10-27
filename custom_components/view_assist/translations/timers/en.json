@@ -60,14 +60,12 @@
     "responses": {
         "timer_set": "Timer set for {time}",
         "timer_named_set": "{name} timer set for {time}",
-        "timer_named_snoozed": "{name} timer snoozed for {snooze_duration}",
-        "timer_snoozed": "Timer snoozed for {snooze_duration}",
-        "timer_already_exists": "A timer called {name} already exists",
         "timer_none": "No timers are set",
         "timer_list": "You have the following timers set: {timers}",
         "timer_cancelled": "Cancelled timer {name}",
         "timer_not_found": "No timer called {name} could be found",
         "time_remaining": "{remaining} remaining on timer {name}",
+        "timer_already_exists": "A timer called {name} already exists",
         "timer_error": "Unable to decode time or interval information"
     }
 }

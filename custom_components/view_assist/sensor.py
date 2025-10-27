@@ -187,7 +187,7 @@ class ViewAssistSensor(SensorEntity):
         d = self.config.runtime_data.default
 
         tm = TimerManager.get(self.hass)
-        timers = tm.get_timers(device_or_entity_id=self.entity_id)
+        timers = tm.get_timers(entity_id=self.entity_id)
         return {
             "last_updated": dt.now().isoformat(),
             "do_not_disturb": d.do_not_disturb,
