@@ -30,7 +30,7 @@ class TimerCards {
 
             let name = timer.name;
             if (!name && timer.timer_type == 'interval') {
-                name = timer.extra_info.sentence
+                name = timer.duration
             }
 
             let expiry_time = timer.expiry.time;
@@ -201,6 +201,11 @@ class TimerCards {
         const timer = window.viewassist.config?.timers.find(t => t.id === timer_id && (t.entity_id === entity_id || !entity_id));
         if (!timer) return card;
 
+        let name = timer.name;
+        if (!name && timer.timer_type == 'interval') {
+            name = timer.duration
+        }
+
 
         function actionButton(action_name, width, background_colour, text_colour, tap_action, display) {
             return {
@@ -283,7 +288,7 @@ class TimerCards {
                 },
             },
             "custom_fields": {
-                "display_timer_name": timer.name,
+                "display_timer_name": name,
                 "time": (timer.timer_type == 'interval') ? `<viewassist-countdown expires='${timer.expires}'></viewassist-countdown>` : timer.expiry.time,
                 "day": (timer.timer_type == 'interval') ? '' : (timer.expiry.day != "Today") ? timer.expiry.day : '',
                 "action_buttons": {

@@ -205,7 +205,7 @@ class WebsocketListenerHandler:
         if event.event_name == VAEventType.TIMER_UPDATE:
             if timers := TimerManager.get(self.hass):
                 event.payload = timers.get_timers(
-                    device_or_entity_id=self.entity_id, include_expired=True
+                    entity_id=self.entity_id, include_expired=True
                 )
 
         # Add config data to event
@@ -259,7 +259,7 @@ class WebsocketListenerHandler:
             timer_info = {}
             if timers := TimerManager.get(self.hass):
                 timer_info = timers.get_timers(
-                    device_or_entity_id=self.entity_id, include_expired=True
+                    entity_id=self.entity_id, include_expired=True
                 )
 
             menu_info = {}

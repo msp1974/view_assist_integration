@@ -17,6 +17,13 @@ import zoneinfo
 
 import voluptuous as vol
 
+from homeassistant.components.intent import (
+    TIMER_DATA,
+    TimerEventType,
+    TimerInfo as IntentTimerInfo,
+    TimerManager as IntentTimerManager,
+)
+from homeassistant.components.intent.timers import _normalize_name
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID, ATTR_NAME, ATTR_TIME
 from homeassistant.core import (
@@ -24,9 +31,12 @@ from homeassistant.core import (
     ServiceCall,
     ServiceResponse,
     SupportsResponse,
-    valid_entity_id,
 )
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import (
+    area_registry as ar,
+    config_validation as cv,
+    device_registry as dr,
+)
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.util import ulid as ulid_util
@@ -42,6 +52,8 @@ from ..const import (  # noqa: TID252
 )
 from ..helpers import (  # noqa: TID252
     get_entity_id_from_conversation_device_id,
+    get_mic_device_domain,
+    get_mic_device_id_from_entity_id,
     get_mimic_entity_id,
 )
 from ..typed import VAEvent, VAEventType  # noqa: TID252
@@ -64,6 +76,13 @@ class TimerClass(StrEnum):
     REMINDER = "reminder"
     TIMER = "timer"
     COMMAND = "command"
+
+
+class TimerType(StrEnum):
+    """Timer type."""
+
+    TIME = "time"
+    INTERVAL = "interval"
 
 
 class TimerStatus(StrEnum):
@@ -91,37 +110,18 @@ class Timer:
 
     id: str
     timer_class: TimerClass
-    original_expires_at: int
-    expires_at: int
-    timer_type: str = "TimerInterval"
+    timer_type: TimerType = field(default_factory=TimerType.INTERVAL)
     name: str | None = None
-    entity_id: str | None = None
+    expires_at: int = 0
+    original_expires_at: int = 0
     pre_expire_warning: int = 0
-    created_at: int = 0
-    updated_at: int = 0
+    entity_id: str | None = None
+    conversation_device_id: str | None = None
     status: TimerStatus = field(default_factory=TimerStatus.INACTIVE)
+    created_at: int = 0
+    created_at_monotonic: int = 0
+    updated_at: int = 0
     extra_info: dict[str, Any] | None = None
-
-
-def _format_interval_numbers(interval_list: list[str | int]) -> list[int]:
-    for idx, entry in enumerate(interval_list):
-        if not entry:
-            interval_list[idx] = 0
-        elif isinstance(entry, str) and entry.isnumeric():
-            interval_list[idx] = int(entry)
-    return interval_list
-
-
-def _format_time_numbers(time_list: list[str | int]) -> list[int]:
-    for idx, entry in enumerate(time_list):
-        if idx in [0, 4]:
-            time_list[idx] = time_list[idx].lower()
-            continue
-        if not entry:
-            time_list[idx] = 0
-        elif isinstance(entry, str) and entry.isnumeric():
-            time_list[idx] = int(entry)
-    return time_list
 
 
 def get_formatted_time(timer_dt: dt.datetime, h24format: bool = False) -> str:
@@ -228,7 +228,7 @@ class VATimerStore:
         """Load tiers from store."""
         stored: dict[str, Any] = await self.store.async_load()
         if stored:
-            stored = await self.migrate(stored)
+            # stored = await self.migrate(stored)
             for timer_id, timer in stored.items():
                 self.timers[timer_id] = Timer(**timer)
         self.dirty = False
@@ -355,8 +355,9 @@ class TimerManager:
     async def add_timer(
         self,
         timer_class: TimerClass,
-        device_or_entity_id: str,
-        timer_info: TimerInfo,
+        device_id: str | None,
+        entity_id: str | None,
+        timer_info: TimerInfo | None,
         name: str | None = None,
         pre_expire_warning: int = 10,
         start: bool = True,
@@ -364,8 +365,9 @@ class TimerManager:
     ) -> tuple:
         """Add timer to store."""
 
-        if not (entity_id := self._ensure_entity_id(device_or_entity_id)):
-            raise vol.Invalid("Invalid device or entity id")
+        if not entity_id:
+            if not (entity_id := self._get_entity_id(device_id)):
+                raise vol.Invalid("Invalid device or entity id")
 
         # calculate expiry time from TimerInfo
         expiry = self.get_expiry_from_timerinfo(timer_info)
@@ -389,8 +391,10 @@ class TimerManager:
                 expires_at=expires_unix_ts,
                 name=name,
                 entity_id=entity_id,
+                conversation_device_id=device_id,
                 pre_expire_warning=pre_expire_warning,
                 created_at=time_now_unix,
+                created_at_monotonic=time.monotonic_ns(),
                 updated_at=time_now_unix,
                 status=TimerStatus.INACTIVE,
                 extra_info=extra_info,
@@ -458,6 +462,10 @@ class TimerManager:
             # if timer.status == TimerStatus.SNOOZED:
             #    return
 
+            device_domain = get_mic_device_domain(self.hass, timer.entity_id)
+            if device_domain == "esphome":
+                await self._start_intent_timer(timer)
+
             if timer.status != TimerStatus.RUNNING:
                 await self.store.update_status(timer.id, TimerStatus.RUNNING)
 
@@ -499,15 +507,18 @@ class TimerManager:
     async def cancel_timer(
         self,
         timer_id: str | None = None,
-        device_or_entity_id: str | None = None,
+        device_id: str | None = None,
+        entity_id: str | None = None,
         cancel_all: bool = False,
         just_expired: bool = False,
     ) -> bool:
         """Cancel timer by timer id, device id or all."""
         if timer_id:
             timer_ids = [timer_id] if self.store.timers.get(timer_id) else []
-        elif device_or_entity_id:
-            if entity_id := self._ensure_entity_id(device_or_entity_id):
+        elif device_id or entity_id:
+            if not entity_id:
+                entity_id = self._get_entity_id(device_id)
+            if entity_id:
                 timer_ids = [
                     timer_id
                     for timer_id, timer in self.store.timers.items()
@@ -525,28 +536,37 @@ class TimerManager:
                     and self.store.timers[timerid].status != TimerStatus.EXPIRED
                 ):
                     continue
+
+                if timer := self.store.timers.get(timerid):
+                    device_domain = get_mic_device_domain(self.hass, timer.entity_id)
+                    if device_domain == "esphome":
+                        await self._cancel_intent_timer(timerid)
+
                 if await self.store.cancel_timer(timerid):
                     _LOGGER.debug("Cancelled timer: %s", timerid)
                     if timer_task := self.timer_tasks.pop(timerid, None):
                         if not timer_task.done():
                             timer_task.cancel()
-            return True
+
+                    return True
 
         return False
 
     def get_timers(
         self,
         timer_id: str = "",
-        device_or_entity_id: str = "",
+        device_id: str = "",
+        entity_id: str = "",
         name: str = "",
         include_expired: bool = False,
         sort: bool = True,
     ) -> list[Timer]:
         """Get list of timers.
 
-        Optionally supply timer_id or device_id to filter the returned list
+        Optionally supply timer_id, device_id or entity id to filter the returned list
         """
 
+        # Get list of all or active only timers
         if include_expired:
             timers = [
                 {"id": tid, **self.format_timer_output(timer)}
@@ -562,24 +582,31 @@ class TimerManager:
         if timer_id:
             timers = [timer for timer in timers if timer["id"] == timer_id]
 
-        elif device_or_entity_id:
-            if entity_id := self._ensure_entity_id(device_or_entity_id):
-                if name:
-                    # If device id and name
-                    timers = [
-                        timer
-                        for timer in timers
-                        if timer["entity_id"] == entity_id and timer["name"] == name
-                    ]
-                else:
-                    timers = [
-                        timer for timer in timers if timer["entity_id"] == entity_id
-                    ]
-            else:
-                timers = []
+        elif device_id or entity_id:
+            if not entity_id:
+                entity_id = self._get_entity_id(device_id)
+            timers = [timer for timer in timers if timer["entity_id"] == entity_id]
 
-        elif name:
-            timers = [timer for timer in timers if timer["name"] == name]
+            # If esphome device, filter by timers registered with timer manager
+            # If using stop to cancel alarm on HAVPE, does not use the cancel service
+            # and therefore the alarm is left behind in expired state.  So filter out any timers
+            # that are not still registered with the intent timer manager
+            device_domain = get_mic_device_domain(self.hass, entity_id)
+            tm: IntentTimerManager = self.hass.data[TIMER_DATA]
+            if device_domain == "esphome":
+                timers = [timer for timer in timers if timer["id"] in tm.timers]
+
+            # Filter by name if supplied
+            if name:
+                # Match on name or plural of name
+                name = str(name).strip()
+                timers = [
+                    timer
+                    for timer in timers
+                    if timer["name"] == name
+                    or str(timer["duration"]).startswith(name)
+                    or timer["time"] == name
+                ]
 
         if sort and timers:
             timers = sorted(timers, key=lambda d: d["expiry"]["seconds"])
@@ -664,16 +691,10 @@ class TimerManager:
             self.hass.bus.async_fire(event_name, event_data)
             _LOGGER.debug("Timer event fired: %s - %s", event_name, event_data)
 
-    def _ensure_entity_id(self, device_or_entity_id: str) -> str:
+    def _get_entity_id(self, device_id: str) -> str:
         """Ensure entity id."""
         # ensure entity id
-        if valid_entity_id(device_or_entity_id.lower()):
-            entity_id = device_or_entity_id
-        else:
-            entity_id = get_entity_id_from_conversation_device_id(
-                self.hass, device_or_entity_id
-            )
-        return entity_id
+        return get_entity_id_from_conversation_device_id(self.hass, device_id)
 
     def is_duplicate_timer(
         self, entity_id: str, name: str, expires_at: int
@@ -724,6 +745,25 @@ class TimerManager:
                 timer_type, dt.datetime.fromtimestamp(expires_at, self.tz), self.tz
             )
 
+        def make_duration_text(timer_info: dict | TimerInfo) -> str:
+            """Generate duration from timer info."""
+            if isinstance(timer_info, TimerInfo):
+                timer_info = timer_info.__dict__
+
+            d = [
+                (k, v)
+                for k, v in timer_info.items()
+                if k in ["days", "hours", "minutes", "seconds"] and int(v) > 0
+            ]
+            out = ""
+            for idx, e in enumerate(d):
+                out += f"{e[1]} {e[0]}"
+                if idx == len(d) - 2:
+                    out += " and "
+                elif idx != len(d) - 1:
+                    out += ", "
+            return out
+
         def speak_remaining(timer: Timer) -> str:
             """Generate speech status."""
 
@@ -751,9 +791,16 @@ class TimerManager:
         return {
             "id": timer.id,
             "entity_id": timer.entity_id,
+            "device_id": timer.conversation_device_id,
             "timer_class": timer.timer_class,
             "timer_type": timer.timer_type,
             "name": timer.name,
+            "duration": make_duration_text(timer.extra_info["timer_info"])
+            if timer.timer_type == TimerType.INTERVAL
+            else "",
+            "time": get_formatted_time(dt_expiry)
+            if timer.timer_type == TimerType.TIME
+            else "",
             "expires": dt_expiry,
             "original_expiry": dt.datetime.fromtimestamp(
                 timer.original_expires_at, self.tz
@@ -809,9 +856,94 @@ class TimerManager:
     async def _timer_finished(self, timer_id: str) -> None:
         """Call event handlers when a timer finishes."""
         _LOGGER.debug("Timer expired: %s", timer_id)
-        await self._fire_event(timer_id, TimerEvent.EXPIRED)
         await self.store.update_status(timer_id, TimerStatus.EXPIRED)
         self.timer_tasks.pop(timer_id, None)
+
+        timer = self.store.timers.get(timer_id)
+        device_domain = get_mic_device_domain(self.hass, timer.entity_id)
+        if device_domain == "esphome":
+            await self._finish_intent_timer(timer_id)
+        else:
+            await self._fire_event(timer_id, TimerEvent.EXPIRED)
+
+    async def _start_intent_timer(self, timer: Timer, retry: bool = True) -> None:
+        """Send intent to VA intent handler."""
+        device_id = get_mic_device_id_from_entity_id(self.hass, timer.entity_id)
+        orig_total_seconds = round(timer.expires_at - timer.created_at)
+        total_seconds = round(
+            timer.expires_at - dt.datetime.now(tz=self.tz).timestamp()
+        )
+        _LOGGER.debug(
+            "Sending intent timer for device id: %s for %s seconds",
+            device_id,
+            total_seconds,
+        )
+
+        tm: IntentTimerManager = self.hass.data[TIMER_DATA]
+        intent_timer = IntentTimerInfo(
+            id=timer.id,
+            name=timer.name,
+            start_hours=0,
+            start_minutes=0,
+            start_seconds=orig_total_seconds,
+            seconds=orig_total_seconds,
+            language=timer.extra_info.get("language", "en"),
+            device_id=device_id,
+            created_at=timer.created_at_monotonic,
+            updated_at=timer.created_at_monotonic,
+        )
+        _LOGGER.debug(
+            "Created intent timer created seconds: %s", intent_timer.created_seconds
+        )
+
+        # Fill in area/floor info
+        device_registry = dr.async_get(self.hass)
+        if device_id and (device := device_registry.async_get(device_id)):
+            intent_timer.area_id = device.area_id
+            area_registry = ar.async_get(self.hass)
+            if device.area_id and (
+                area := area_registry.async_get_area(device.area_id)
+            ):
+                intent_timer.area_name = _normalize_name(area.name)
+                intent_timer.floor_id = area.floor_id
+
+        tm.timers[timer.id] = intent_timer
+        if (not intent_timer.conversation_command) and (
+            intent_timer.device_id in tm.handlers
+        ):
+            tm.handlers[intent_timer.device_id](TimerEventType.STARTED, intent_timer)
+        elif retry:
+            self.config.async_create_background_task(
+                self.hass,
+                self._retry_start_intent_timer(timer),
+                name=f"Retry Intent Timer {timer.id}",
+            )
+
+    async def _retry_start_intent_timer(self, timer: Timer) -> None:
+        """Retry starting intent timer after delay."""
+        # TODO: Can we restart timers when device comes back online instead?
+        await asyncio.sleep(10)
+        await self._start_intent_timer(timer, retry=False)
+
+    async def _finish_intent_timer(self, timer_id: str) -> None:
+        """Finish intent timer by timer id."""
+        if timer := self.store.timers.get(timer_id):
+            device_id = get_mic_device_id_from_entity_id(self.hass, timer.entity_id)
+            tm: IntentTimerManager = self.hass.data[TIMER_DATA]
+            if timer := tm.timers.pop(timer_id):
+                timer.finish()
+                if device_id in tm.handlers:
+                    tm.handlers[device_id](TimerEventType.FINISHED, timer)
+
+    async def _cancel_intent_timer(self, timer_id: str) -> bool:
+        """Cancel intent timer by timer id."""
+        if timer := self.store.timers.get(timer_id):
+            device_id = get_mic_device_id_from_entity_id(self.hass, timer.entity_id)
+            tm: IntentTimerManager = self.hass.data[TIMER_DATA]
+            if timer := tm.timers.pop(timer_id):
+                timer.cancel()
+                if device_id in tm.handlers:
+                    tm.handlers[device_id](TimerEventType.CANCELLED, timer)
 
 
 class TimerManagerServices:
@@ -985,7 +1117,8 @@ class TimerManagerServices:
             tm = TimerManager.get(self.hass)
             response_id, timer = await tm.add_timer(
                 timer_class=timer_type,
-                device_or_entity_id=entity_id if entity_id else device_id,
+                device_id=device_id,
+                entity_id=entity_id,
                 timer_info=timer_info,
                 name=name,
                 extra_info=extra_info,
@@ -1045,11 +1178,15 @@ class TimerManagerServices:
             tm = TimerManager.get(self.hass)
             result = await tm.cancel_timer(
                 timer_id=timer_id,
-                device_or_entity_id=entity_id if entity_id else device_id,
+                device_id=device_id,
+                entity_id=entity_id,
                 cancel_all=cancel_all,
                 just_expired=just_expired,
             )
-            return {"result": result}
+            response = await self.create_response(
+                "timer_cancelled" if result else "timer_not_found"
+            )
+            return {"response": response}
         return {"error": "no attribute supplied"}
 
     async def _async_handle_get_timers(self, call: ServiceCall) -> ServiceResponse:
@@ -1063,7 +1200,8 @@ class TimerManagerServices:
         tm = TimerManager.get(self.hass)
         result = tm.get_timers(
             timer_id=timer_id,
-            device_or_entity_id=entity_id if entity_id else device_id,
+            device_id=device_id,
+            entity_id=entity_id,
             name=name,
             include_expired=include_expired,
         )
