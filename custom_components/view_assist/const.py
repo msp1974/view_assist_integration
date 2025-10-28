@@ -58,7 +58,7 @@ JSMODULES = [
     {
         "name": "View Assist Helper",
         "filename": "view_assist.js",
-        "version": "1.0.21",
+        "version": "1.0.22",
     },
 ]
 # mins between checks for updated versions of dashboard and views

@@ -78,7 +78,7 @@ class TimerCards {
                         "event_data": {
                             "command": "dismiss alarm",
                             "entity_id": timer.entity_id,
-                            "timer_id": timer.id
+                            "timer_id": timer.id,
                         }
                     }
                 },
@@ -110,7 +110,7 @@ class TimerCards {
                         "event_data": {
                             "command": "snooze alarm",
                             "entity_id": timer.entity_id,
-                            "timer_id": timer.id
+                            "timer_id": timer.id,
                         }
                     }
                 },
@@ -342,7 +342,7 @@ class TimerCards {
                                         "event_data": {
                                             "command": "snooze alarm",
                                             "entity_id": entity_id,
-                                            "mic_device": "XXX"
+                                            "timer_id": timer.id,
                                         }
                                     }
                                 },
@@ -358,6 +358,7 @@ class TimerCards {
                                         "event_data": {
                                             "command": "dismiss alarm",
                                             "entity_id": entity_id,
+                                            "timer_id": timer.id,
                                         }
                                     }
                                 },
