@@ -583,7 +583,8 @@ class EntityStateChangedHandler:
                         navigation_manager.browser_navigate(
                             self.config.runtime_data.dashboard.list_view
                         )
-            elif not processed_locally:
+            # Checks if AI response or if no speech is returned
+            elif not processed_locally and speech_text != "*":
                 _LOGGER.debug("No entities or todo lists affected")
                 word_count = len(speech_text.split())
                 message_font_size = ["10vw", "8vw", "6vw", "4vw"][
