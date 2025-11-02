@@ -1,16 +1,17 @@
 """Handlers alarm repeater."""
 
+from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass
 import io
 import logging
-import math
 import time
 from typing import Any
-import voluptuous as vol
 
 import mutagen
 import requests
+import voluptuous as vol
 
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
@@ -25,13 +26,15 @@ from homeassistant.helpers import entity, selector
 from homeassistant.helpers.entity_component import DATA_INSTANCES, EntityComponent
 from homeassistant.helpers.network import get_url
 
-from .const import (
+from ..const import (  # noqa: TID252
     ATTR_MAX_REPEATS,
     ATTR_MEDIA_FILE,
     ATTR_RESUME_MEDIA,
+    ATTR_TIMER_ID,
     BROWSERMOD_DOMAIN,
     DOMAIN,
 )
+from .timers import TimerManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,9 +53,10 @@ ALARM_SOUND_SERVICE_SCHEMA = vol.Schema(
 
 STOP_ALARM_SOUND_SERVICE_SCHEMA = vol.Schema(
     {
-        vol.Optional(ATTR_ENTITY_ID): selector.EntitySelector(
+        vol.Required(ATTR_ENTITY_ID): selector.EntitySelector(
             selector.EntitySelectorConfig(integration=DOMAIN)
         ),
+        vol.Optional(ATTR_TIMER_ID): str,
     }
 )
 
@@ -69,8 +73,13 @@ class PlayingMedia:
     queue: Any | None = None
 
 
-class VAAlarmRepeater:
+class AlarmRepeater:
     """Class to handle announcing on media player with resume."""
+
+    @classmethod
+    def get(cls, hass: HomeAssistant) -> AlarmRepeater | None:
+        """Get the alarm repeater instance."""
+        return hass.data[DOMAIN][cls.__name__]
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
         """Initialise."""
@@ -80,6 +89,9 @@ class VAAlarmRepeater:
         self.alarm_tasks: dict[str, asyncio.Task] = {}
 
         self.announcement_in_progress: bool = False
+
+    async def async_setup(self) -> bool:
+        """Start the alarm repeater."""
 
         self.hass.services.async_register(
             DOMAIN,
@@ -95,6 +107,15 @@ class VAAlarmRepeater:
             schema=STOP_ALARM_SOUND_SERVICE_SCHEMA,
         )
 
+        return True
+
+    async def async_unload(self) -> bool:
+        """Stop the alarm repeater."""
+        await self.cancel_alarm_sound()
+        self.hass.services.async_remove(DOMAIN, "sound_alarm")
+        self.hass.services.async_remove(DOMAIN, "cancel_sound_alarm")
+        return True
+
     async def _async_handle_alarm_sound(self, call: ServiceCall) -> ServiceResponse:
         """Handle alarm sound."""
         entity_id = call.data.get(ATTR_ENTITY_ID)
@@ -109,7 +130,8 @@ class VAAlarmRepeater:
     async def _async_handle_stop_alarm_sound(self, call: ServiceCall):
         """Handle stop alarm sound."""
         entity_id = call.data.get(ATTR_ENTITY_ID)
-        await self.cancel_alarm_sound(entity_id)
+        timer_id = call.data.get(ATTR_TIMER_ID)
+        await self.cancel_alarm_sound(entity_id, timer_id)
 
     def _get_entity_from_entity_id(self, entity_id: str):
         """Get entity object from entity_id."""
@@ -406,7 +428,9 @@ class VAAlarmRepeater:
                     pass
         return {}
 
-    async def cancel_alarm_sound(self, entity_id: str | None = None):
+    async def cancel_alarm_sound(
+        self, entity_id: str | None = None, timer_id: str | None = None
+    ):
         """Cancel announcement."""
         if entity_id:
             entities = [entity_id]
@@ -426,3 +450,10 @@ class VAAlarmRepeater:
                     )
                 self.alarm_tasks[mp_entity_id].cancel()
                 _LOGGER.debug("Alarm sound cancelled")
+
+        # Cancel timer if timer_id provided
+        if timer_id:
+            tm = TimerManager.get(self.hass)
+            if tm:
+                await tm.cancel_timer(timer_id)
+                _LOGGER.debug("Cancelled timer %s", timer_id)

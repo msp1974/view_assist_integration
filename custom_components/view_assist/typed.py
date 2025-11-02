@@ -11,12 +11,24 @@ from homeassistant.config_entries import ConfigEntry
 type VAConfigEntry = ConfigEntry[MasterConfigRuntimeData | DeviceRuntimeData]
 
 
+class VALoadedState(StrEnum):
+    """Loaded state enum."""
+
+    NOT_LOADED = "not_loaded"
+    LOADED = "loaded"
+    LOAD_FAILED = "load_failed"
+
+
 class VAType(StrEnum):
     """Sensor type enum."""
 
     MASTER_CONFIG = "master_config"
-    VIEW_AUDIO = "view_audio"
     AUDIO_ONLY = "audio_only"
+    VIEW_AUDIO = "view_audio"
+    VACA = "vaca"
+
+
+DISPLAY_DEVICE_TYPES = [VAType.VIEW_AUDIO, VAType.VACA]
 
 
 class VATimeFormat(StrEnum):
@@ -64,6 +76,7 @@ class VABackgroundMode(StrEnum):
     LOCAL_SEQUENCE = "local_sequence"
     LOCAL_RANDOM = "local_random"
     DOWNLOAD_RANDOM = "download"
+    DOWNLOAD_URL = "custom_url"
     LINKED = "link_to_entity"
 
 
@@ -80,6 +93,7 @@ class IntegrationConfig:
     """Class to hold integration config data."""
 
     enable_updates: bool = True
+    translation_engine: str | None = None
 
 
 @dataclass
@@ -177,13 +191,29 @@ class DeviceRuntimeData:
         self.core: DeviceCoreConfig = DeviceCoreConfig()
         self.dashboard: DashboardConfig = DashboardConfig()
         self.default: DefaultConfig = DefaultConfig()
+
         # Extra data for holding key/value pairs passed in by set_state service call
         self.extra_data: dict[str, Any] = {}
+
+
+class VAEventType(StrEnum):
+    """View Assist event types."""
+
+    BACKGROUND_CHANGE = "background_change"
+    MENU_UPDATE = "menu_update"
+    NAVIGATION = "navigate"
+    TIMER_EXPIRED = "timer_expired"
+    CONFIG_UPDATE = "config_update"
+    ASSIST_LISTENING = "listening"
+    BROWSER_REGISTERED = "registered"
+    BROWSER_UNREGISTERED = "unregistered"
+    TIMER_UPDATE = "timer_update"
+    RELOAD = "reload"
 
 
 @dataclass
 class VAEvent:
     """View Assist event."""
 
-    event_name: str
+    event_name: VAEventType
     payload: dict | None = None

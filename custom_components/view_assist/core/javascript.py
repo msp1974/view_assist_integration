@@ -1,5 +1,7 @@
 """View Assist Javascript module registration."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_call_later
 
 from ..const import DOMAIN, JSMODULES, URL_BASE  # noqa: TID252
+from ..typed import VAConfigEntry  # noqa: TID252
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,12 +21,13 @@ JS_URL = f"/{URL_BASE}/js"
 class JSModuleRegistration:
     """Register Javascript modules."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(self, hass: HomeAssistant, config: VAConfigEntry) -> None:
         """Initialise."""
         self.hass = hass
+        self.config = config
         self.lovelace: LovelaceData = self.hass.data.get("lovelace")
 
-    async def async_register(self):
+    async def async_setup(self) -> bool:
         """Register view_assist path."""
         # Remove previous registration - can be removed after this version
         await self.async_unregister(URL_BASE)
@@ -31,15 +35,23 @@ class JSModuleRegistration:
         await self._async_register_path()
         if self.lovelace.mode == "storage":
             await self._async_wait_for_lovelace_resources()
+        return True
+
+    async def async_unload(self) -> bool:
+        """Unload javascript module registration."""
+        if self.lovelace.mode == "storage":
+            await self.async_unregister()
+        return True
 
     # install card resources
     async def _async_register_path(self):
         """Register resource path if not already registered."""
         try:
+            path = Path(self.hass.config.path(f"custom_components/{DOMAIN}/js_modules"))
             await self.hass.http.async_register_static_paths(
-                [StaticPathConfig(JS_URL, Path(__file__).parent, False)]
+                [StaticPathConfig(JS_URL, path, False)]
             )
-            _LOGGER.debug("Registered resource path from %s", Path(__file__).parent)
+            _LOGGER.debug("Registered resource path from %s", path)
         except RuntimeError:
             # Runtime error is likley this is already registered.
             _LOGGER.debug("Resource path already registered")

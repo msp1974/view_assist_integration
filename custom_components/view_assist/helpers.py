@@ -1,17 +1,15 @@
 """Helper functions."""
 
-from bs4 import BeautifulSoup
 from functools import reduce
 import logging
 from pathlib import Path
 from typing import Any
 
-import requests
+from bs4 import BeautifulSoup
 
 from homeassistant.const import CONF_TYPE, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.util import slugify
 
 from .const import (
     BROWSERMOD_DOMAIN,
@@ -19,14 +17,12 @@ from .const import (
     DASHBOARD_DIR,
     DOMAIN,
     HASSMIC_DOMAIN,
-    IMAGE_PATH,
     OVERLAY_FILE_NAME,
-    RANDOM_IMAGE_URL,
     REMOTE_ASSIST_DISPLAY_DOMAIN,
     VAMODE_REVERTS,
     VAMode,
 )
-from .typed import VAConfigEntry, VADisplayType, VAType
+from .typed import VAConfigEntry, VADisplayType, VAType, DISPLAY_DEVICE_TYPES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +33,7 @@ def get_integration_entries(
 ) -> list[VAConfigEntry]:
     """Get list of config entries for the integration."""
     if accepted_types is None:
-        accepted_types = [VAType.VIEW_AUDIO, VAType.AUDIO_ONLY]
+        accepted_types = [*DISPLAY_DEVICE_TYPES, VAType.AUDIO_ONLY]
     return [
         entry
         for entry in hass.config_entries.async_entries(DOMAIN)
@@ -83,7 +79,7 @@ def is_first_instance(
 
     Optional to return if first config entry for instance with type of view_audio
     """
-    accepted_types = [VAType.VIEW_AUDIO]
+    accepted_types = DISPLAY_DEVICE_TYPES
     if not display_instance_only:
         accepted_types.append(VAType.AUDIO_ONLY)
 
@@ -103,52 +99,6 @@ def ensure_list(value: str | list[str]):
         value = (value.replace("[", "").replace("]", "").replace('"', "")).split(",")
         return value if value else []
     return []
-
-
-def normalize_status_items(raw_input: Any) -> str | list[str] | None:
-    """Normalize and validate status item input.
-
-    Handles various input formats:
-    - Single string
-    - List of strings
-    - JSON string representing a list
-    - Dictionary with attributes
-
-    Returns:
-    - Single string
-    - List of strings
-    - None if invalid input
-    """
-    import json
-
-    if raw_input is None:
-        return None
-
-    if isinstance(raw_input, str):
-        if raw_input.startswith("[") and raw_input.endswith("]"):
-            try:
-                parsed = json.loads(raw_input)
-                if isinstance(parsed, list):
-                    string_items = [str(item) for item in parsed if item]
-                    return string_items if string_items else None
-                return None
-            except json.JSONDecodeError:
-                return raw_input if raw_input else None
-        return raw_input if raw_input else None
-
-    if isinstance(raw_input, list):
-        string_items = [str(item) for item in raw_input if item]
-        return string_items if string_items else None
-
-    if isinstance(raw_input, dict):
-        if "id" in raw_input:
-            return str(raw_input["id"])
-        if "name" in raw_input:
-            return str(raw_input["name"])
-        if "value" in raw_input:
-            return str(raw_input["value"])
-
-    return None
 
 
 def get_entity_attribute(hass: HomeAssistant, entity_id: str, attribute: str) -> Any:
@@ -188,16 +138,6 @@ def get_master_config_entry(hass: HomeAssistant) -> VAConfigEntry:
     return None
 
 
-def get_device_name_from_id(hass: HomeAssistant, device_id: str) -> str:
-    """Get the browser_id for the device based on device domain."""
-    if device_id.startswith("va-"):
-        return device_id
-    device_reg = dr.async_get(hass)
-    device = device_reg.async_get(device_id)
-
-    return device.name if device else None
-
-
 def get_device_id_from_entity_id(hass: HomeAssistant, entity_id: str) -> str:
     """Get the device id of an entity by id."""
     entity_registry = er.async_get(hass)
@@ -223,6 +163,31 @@ def get_devices_for_domain(hass: HomeAssistant, domain: str) -> list[dr.DeviceEn
             )
         return devices
     return []
+
+
+def get_mic_device_domain(hass: HomeAssistant, entity_id: str) -> str | None:
+    """Get the mic device domain of an entity by id."""
+    entity_registry = er.async_get(hass)
+    if va_entity := entity_registry.async_get(entity_id):
+        va_entry = hass.config_entries.async_get_entry(va_entity.config_entry_id)
+        if mic_entity := va_entry.data.get("mic_device"):
+            mic_entity_entry = entity_registry.async_get(mic_entity)
+            if mic_entity_entry:
+                entry_id = mic_entity_entry.config_entry_id
+                entry = hass.config_entries.async_get_entry(entry_id)
+                if entry:
+                    return entry.domain
+    return None
+
+
+def get_mic_device_id_from_entity_id(hass: HomeAssistant, entity_id: str) -> str | None:
+    """Get the mic device id of an entity by id."""
+    entity_registry = er.async_get(hass)
+    if va_entity := entity_registry.async_get(entity_id):
+        va_entry = hass.config_entries.async_get_entry(va_entity.config_entry_id)
+        if mic_entity := va_entry.data.get("mic_device"):
+            return entity_registry.async_get(mic_entity).device_id
+    return None
 
 
 def get_device_id_from_name(hass: HomeAssistant, device_name: str) -> str:
@@ -285,7 +250,6 @@ def get_entity_id_from_conversation_device_id(
 
 def get_mimic_entity_id(hass: HomeAssistant, browser_id: str | None = None) -> str:
     """Get mimic entity id."""
-    # If we reach here, no match for browser_id was found
     master_entry = get_master_config_entry(hass)
     if browser_id:
         if get_display_type_from_browser_id(hass, browser_id) == "native":
@@ -442,77 +406,6 @@ def get_key(
         return reduce(dict.get, dn_list, data)
     except (TypeError, KeyError):
         return None
-
-
-# ----------------------------------------------------------------
-# Images
-# ----------------------------------------------------------------
-async def async_get_download_image(
-    hass: HomeAssistant, config: VAConfigEntry, save_path: str = IMAGE_PATH
-) -> Path:
-    """Get url from unsplash random image endpoint."""
-    return await hass.async_add_executor_job(
-        get_download_image, hass, config, save_path
-    )
-
-
-def get_download_image(
-    hass: HomeAssistant, config: VAConfigEntry, save_path: str = IMAGE_PATH
-) -> Path:
-    """Get url from unsplash random image endpoint."""
-    path = Path(hass.config.config_dir, DOMAIN, save_path)
-    filename = f"downloaded_{config.entry_id.lower()}_{slugify(config.runtime_data.core.name)}.jpg"
-    image: Path | None = None
-
-    try:
-        response = requests.get(RANDOM_IMAGE_URL, timeout=10)
-    except TimeoutError:
-        _LOGGER.warning(
-            "Timeout trying to fetch random image from %s", RANDOM_IMAGE_URL
-        )
-    else:
-        if response.status_code == 200:
-            try:
-                # Ensure path exists
-                path.mkdir(parents=True, exist_ok=True)
-                with Path(path, filename).open(mode="wb") as file:
-                    file.write(response.content)
-            except OSError as ex:
-                _LOGGER.warning(
-                    "Unable to save downloaded random image file.  Error is %s", ex
-                )
-
-    image = Path(path, filename)
-    if image.exists():
-        return image
-
-    _LOGGER.warning("No existing images found for background")
-    return None
-
-
-async def async_get_filesystem_images(hass: HomeAssistant, fs_path: str) -> list[Path]:
-    """Get url from filesystem random image."""
-    return await hass.async_add_executor_job(get_filesystem_images, hass, fs_path)
-
-
-def get_filesystem_images(hass: HomeAssistant, fs_path: str) -> list[Path]:
-    """Get url from filesystem random image."""
-    valid_extensions = (".jpeg", ".jpg", ".tif", ".png")
-    path = Path(hass.config.config_dir, DOMAIN, fs_path)
-    if not path.exists():
-        _LOGGER.warning("Random image path %s does not exist", path)
-        return None
-
-    image_list = [
-        f for f in path.iterdir() if f.is_file and f.name.endswith(valid_extensions)
-    ]
-
-    # Check if any images were found
-    if not image_list:
-        _LOGGER.warning("No images found in random image path - %s", path)
-        return None
-
-    return image_list
 
 
 def differ_to_json(diffs: list) -> dict:

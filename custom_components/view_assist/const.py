@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from homeassistant.const import CONF_MODE
+from homeassistant.const import CONF_MODE, Platform
 
 from .typed import (
     VABackgroundMode,
@@ -11,6 +11,8 @@ from .typed import (
     VAScreenMode,
     VATimeFormat,
 )
+
+PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 DOMAIN = "view_assist"
 GITHUB_REPO = "dinki/View-Assist"
@@ -27,6 +29,18 @@ WIKI_URL = "https://dinki.github.io/View-Assist"
 
 DEFAULT_VIEW = "clock"
 CYCLE_VIEWS = ["music", "info", "weather", "clock"]
+DASHBOARD_ICONS = [
+    "mic",
+    "hold",
+    "cycle",
+    "dnd",
+    "weather",
+    "home",
+    "camera",
+    "wake",
+    "menu",
+    "timer",
+]
 
 BROWSERMOD_DOMAIN = "browser_mod"
 REMOTE_ASSIST_DISPLAY_DOMAIN = "remote_assist_display"
@@ -44,12 +58,11 @@ JSMODULES = [
     {
         "name": "View Assist Helper",
         "filename": "view_assist.js",
-        "version": "1.0.17",
+        "version": "1.0.22",
     },
 ]
-VERSION_CHECK_INTERVAL = (
-    120  # mins between checks for updated versions of dashboard and views
-)
+# mins between checks for updated versions of dashboard and views
+VERSION_CHECK_INTERVAL = 120
 
 
 class VAMode(StrEnum):
@@ -73,6 +86,10 @@ VAMODE_REVERTS = {
 
 
 # Config keys
+DATA = "data"
+MASTER_CONFIG = "master_config"
+DEVICES = "devices"
+CONF_VA_BROWSER_IDS = "va_browser_ids"
 CONF_MIC_DEVICE = "mic_device"
 CONF_MEDIAPLAYER_DEVICE = "mediaplayer_device"
 CONF_MUSICPLAYER_DEVICE = "musicplayer_device"
@@ -110,6 +127,7 @@ CONF_MIC_UNMUTE = "micunmute"
 CONF_DUCKING_VOLUME = "ducking_volume"
 
 CONF_ENABLE_UPDATES = "enable_updates"
+CONF_TRANSLATION_ENGINE = "translation_engine"
 CONF_DEVELOPER_DEVICE = "developer_device"
 CONF_DEVELOPER_MIMIC_DEVICE = "developer_mimic_device"
 
@@ -166,17 +184,19 @@ DEFAULT_VALUES = {
 
 # Config default values
 DEFAULT_NAME = "View Assist"
-DEFAULT_TYPE = "view_audio"
+DEFAULT_TYPE = "vaca"
 DEFAULT_VIEW_INFO = "info"
 
 
 # Service attributes
 ATTR_EVENT_NAME = "event_name"
 ATTR_EVENT_DATA = "event_data"
-ATTR_PATH = "path"
+
 ATTR_DEVICE = "device"
 ATTR_EXTRA = "extra"
 ATTR_TYPE = "type"
+
+ATTR_LANGUAGE = "language"
 ATTR_TIMER_ID = "timer_id"
 ATTR_REMOVE_ALL = "remove_all"
 ATTR_INCLUDE_EXPIRED = "include_expired"
@@ -188,6 +208,7 @@ ATTR_BACKUP_CURRENT_ASSET = "backup_current_asset"
 ATTR_DOWNLOAD_FROM_REPO = "download_from_repo"
 ATTR_DOWNLOAD_FROM_DEV_BRANCH = "download_from_dev_branch"
 ATTR_DISCARD_DASHBOARD_USER_CHANGES = "discard_dashboard_user_changes"
+
 
 VA_ATTRIBUTE_UPDATE_EVENT = "va_attr_update_event_{}"
 VA_BACKGROUND_UPDATE_EVENT = "va_background_update_{}"

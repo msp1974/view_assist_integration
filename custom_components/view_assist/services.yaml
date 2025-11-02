@@ -19,6 +19,18 @@ navigate:
       required: true
       selector:
         text:
+    revert_timeout:
+      name: Revert timeout
+      description: >
+        Optional timeout in seconds to revert to the previous view.  If not set, uses the default configured timeout.
+      example: 30
+      required: false
+      default: 20
+      selector:
+        number:
+          min: 0
+          max: 120
+          step: 1
 set_state:
   name: Set state or attributes
   description: >
@@ -138,6 +150,12 @@ get_timers:
       required: false
       selector:
         text:
+    include_expired:
+      name: "Include expired"
+      description: "Whether to include expired timers in the results"
+      required: false
+      selector:
+        boolean:
 snooze_timer:
   name: Snooze a timer
   description: Snooze an expired timer for a certain time

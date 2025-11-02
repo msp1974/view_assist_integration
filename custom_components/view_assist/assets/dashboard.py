@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import operator
 from pathlib import Path
@@ -29,12 +30,55 @@ from ..const import (  # noqa: TID252
     GITHUB_DEV_BRANCH,
 )
 from ..helpers import differ_to_json, get_key, json_to_dictdiffer  # noqa: TID252
-from ..typed import VAConfigEntry  # noqa: TID252
-from ..utils import dictdiff  # noqa: TID252
-from ..websocket import MockWSConnection  # noqa: TID252
+from . import VAConfigEntry
 from .base import AssetManagerException, BaseAssetManager, InstallStatus
+from .utils import dictdiff
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class MockWSConnection:
+    """Mock a websocket connection to be able to call websocket handler functions.
+
+    This is here for creating the View Assist dashboard
+    """
+
+    @dataclass
+    class MockAdminUser:
+        """Mock admin user for use in MockWSConnection."""
+
+        is_admin = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initilise."""
+        self.hass = hass
+        self.user = self.MockAdminUser()
+
+        self.failed_request: bool = False
+
+    def send_result(self, id, item):
+        """Receive result."""
+        self.failed_request = False
+
+    def send_error(self, id, code, msg):
+        """Receive error."""
+        self.failed_request = True
+
+    def execute_ws_func(self, ws_type: str, msg: dict[str, Any]) -> bool:
+        """Execute ws function."""
+        if self.hass.data["websocket_api"].get(ws_type):
+            try:
+                handler, schema = self.hass.data["websocket_api"][ws_type]
+                if schema is False:
+                    handler(self.hass, self, msg)
+                else:
+                    handler(self.hass, self, schema(msg))
+            except Exception as ex:  # noqa: BLE001
+                _LOGGER.error("Error calling %s.  Error is %s", ws_type, ex)
+                return False
+            else:
+                return True
+        return False
 
 
 class DashboardManager(BaseAssetManager):

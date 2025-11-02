@@ -34,8 +34,6 @@ from .views import ViewManager
 
 _LOGGER = logging.getLogger(__name__)
 
-ASSETS_MANAGER = "assets_manager"
-
 
 class AssetClass(StrEnum):
     """Asset class."""
@@ -136,6 +134,14 @@ class AssetsManagerStorage:
 class AssetsManager:
     """Class to manage VA asset installs/updates/deletes etc."""
 
+    @classmethod
+    def get(cls, hass: HomeAssistant) -> "AssetsManager":
+        """Get the asset manager."""
+        try:
+            return hass.data[DOMAIN][cls.__name__]
+        except KeyError:
+            return None
+
     def __init__(self, hass: HomeAssistant, config: VAConfigEntry) -> None:
         """Initialise."""
         self.hass = hass
@@ -148,7 +154,6 @@ class AssetsManager:
     async def async_setup(self) -> None:
         """Set up the AssetManager."""
         try:
-            _LOGGER.debug("Setting up AssetsManager")
             self.data = await self.store.load()
 
             # Setup managers
@@ -196,6 +201,7 @@ class AssetsManager:
                         timedelta(minutes=VERSION_CHECK_INTERVAL),
                     )
                 )
+
         except Exception as ex:
             _LOGGER.error("Error setting up AssetsManager. Error is %s", ex)
             raise HomeAssistantError(f"Error setting up AssetsManager: {ex}") from ex
@@ -291,18 +297,17 @@ class AssetsManager:
             # Reduces download by only getting version from repo if the last commit date is greater than
             # we have stored
             update_from_repo = True
-            if self.data.get("last_commit"):
-                if repo_last_commit := await manager.async_get_last_commit():
-                    stored_last_commit = self.data.get("last_commit").get(asset_class)
-                    if repo_last_commit == stored_last_commit:
-                        _LOGGER.debug(
-                            "No new updates in repo for %s",
-                            asset_class,
-                        )
-                        update_from_repo = False
+            repo_last_commit = await manager.async_get_last_commit()
+            if repo_last_commit and self.data.get("last_commit"):
+                stored_last_commit = self.data.get("last_commit").get(asset_class)
+                if repo_last_commit == stored_last_commit:
+                    _LOGGER.debug(
+                        "No new updates in repo for %s",
+                        asset_class,
+                    )
+                    update_from_repo = False
 
             if update_from_repo:
-                repo_last_commit = await manager.async_get_last_commit()
                 _LOGGER.debug("New updates in repo for %s", asset_class)
                 self.data.setdefault("last_commit", {})
                 self.data["last_commit"][asset_class] = repo_last_commit
@@ -311,13 +316,14 @@ class AssetsManager:
             if version_info := await manager.async_get_version_info(update_from_repo):
                 for name, versions in version_info.items():
                     self.data[asset_class][name] = versions
-                    # Fire update entity update event
-                    if versions["installed"]:
-                        self._fire_updates_update(
-                            asset_class,
-                            name,
-                            AwesomeVersion(versions["installed"]) >= versions["latest"],
-                        )
+                    # Fire update entity update event if asset is installed or new asset
+                    self._fire_updates_update(
+                        asset_class,
+                        name,
+                        AwesomeVersion(versions["installed"]) >= versions["latest"]
+                        if versions["installed"]
+                        else False,
+                    )
 
             await self.store.update(asset_class, None, self.data[asset_class])
         _LOGGER.debug("Latest versions updated")
@@ -357,11 +363,18 @@ class AssetsManager:
                 await self.store.update(asset_class, name, self.data[asset_class][name])
 
     def _fire_updates_update(
-        self, asset_class: AssetClass, name: str, remove: bool
+        self,
+        asset_class: AssetClass,
+        name: str,
+        remove: bool,
     ) -> None:
         """Fire update entity update event."""
         async_dispatcher_send(
             self.hass,
             VA_ADD_UPDATE_ENTITY_EVENT,
-            {"asset_class": asset_class, "name": name, "remove": remove},
+            {
+                "asset_class": asset_class,
+                "name": name,
+                "remove": remove,
+            },
         )

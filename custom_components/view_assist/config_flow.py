@@ -11,11 +11,16 @@ from homeassistant.components.media_player import DOMAIN as MEDIAPLAYER_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.weather import DOMAIN as WEATHER_DOMAIN
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
-from homeassistant.const import CONF_MODE, CONF_NAME, CONF_TYPE, Platform
+from homeassistant.const import CONF_DEVICE, CONF_MODE, CONF_NAME, CONF_TYPE, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import SectionConfig, section
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    ConversationAgentSelector,
+    ConversationAgentSelectorConfig,
+    DeviceSelector,
+    DeviceSelectorConfig,
     EntityFilterSelectorConfig,
     EntitySelector,
     EntitySelectorConfig,
@@ -27,9 +32,8 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
-from .assets import ASSETS_MANAGER, AssetClass
+from .assets import AssetClass, AssetsManager
 from .const import (
-    BROWSERMOD_DOMAIN,
     CONF_ASSIST_PROMPT,
     CONF_BACKGROUND,
     CONF_BACKGROUND_MODE,
@@ -62,6 +66,7 @@ from .const import (
     CONF_STATUS_ICON_SIZE,
     CONF_STATUS_ICONS,
     CONF_TIME_FORMAT,
+    CONF_TRANSLATION_ENGINE,
     CONF_USE_ANNOUNCE,
     CONF_VIEW_TIMEOUT,
     CONF_WEATHER_ENTITY,
@@ -70,16 +75,12 @@ from .const import (
     DEFAULT_VALUES,
     DOMAIN,
     MIN_DASHBOARD_FOR_OVERLAYS,
-    REMOTE_ASSIST_DISPLAY_DOMAIN,
     VACA_DOMAIN,
     VAIconSizes,
 )
-from .helpers import (
-    get_available_overlays,
-    get_devices_for_domain,
-    get_master_config_entry,
-)
+from .helpers import get_available_overlays, get_master_config_entry
 from .typed import (
+    DISPLAY_DEVICE_TYPES,
     VAAssistPrompt,
     VABackgroundMode,
     VAConfigEntry,
@@ -134,29 +135,39 @@ BASE_DEVICE_SCHEMA = vol.Schema(
 )
 
 
+def get_vaca_config(hass: HomeAssistant, device_id: str) -> dict[str, Any]:
+    """Get the config for a VACA device."""
+
+    def get_entity(
+        domain: str, suffix: str, entities: list[er.RegistryEntry]
+    ) -> str | None:
+        for entity in entities:
+            if entity.entity_id.startswith(f"{domain}."):
+                if (not suffix) or (suffix and entity.entity_id.endswith(f"_{suffix}")):
+                    return entity.entity_id
+        return None
+
+    def get_display_id(device_id: str) -> str | None:
+        device_registry = dr.async_get(hass)
+        if device := device_registry.async_get(device_id):
+            return f"va-{device.name.split(' ')[1]}"
+        return None
+
+    entity_registry = er.async_get(hass)
+    entities = er.async_entries_for_device(entity_registry, device_id)
+    return {
+        CONF_MIC_DEVICE: get_entity("assist_satellite", "", entities) or "",
+        CONF_MEDIAPLAYER_DEVICE: get_entity("media_player", "", entities) or "",
+        CONF_MUSICPLAYER_DEVICE: get_entity("media_player", "", entities) or "",
+        CONF_INTENT_DEVICE: get_entity("sensor", "intent", entities) or "",
+        CONF_DISPLAY_DEVICE: get_display_id(device_id) or "",
+    }
+
+
 def get_display_devices(
     hass: HomeAssistant, config: VAConfigEntry | None = None
 ) -> dict[str, Any]:
     """Get display device options."""
-    domain_filters = [BROWSERMOD_DOMAIN, REMOTE_ASSIST_DISPLAY_DOMAIN]
-
-    hass_data = hass.data.setdefault(DOMAIN, {})
-    display_devices: dict[str, Any] = hass_data.get("va_browser_ids", {})
-
-    # Add suported domain devices
-    for domain in domain_filters:
-        domain_devices = get_devices_for_domain(hass, domain)
-        if domain_devices:
-            for device in domain_devices:
-                display_devices[device.id] = device.name
-
-    # Add current setting if not already in list
-    if config is not None:
-        attrs = [CONF_DISPLAY_DEVICE, CONF_DEVELOPER_DEVICE]
-        for attr in attrs:
-            if d := config.data.get(attr):
-                if d not in display_devices:
-                    display_devices[d] = d
 
     # Make into options dict
     return [
@@ -164,7 +175,7 @@ def get_display_devices(
             "value": key,
             "label": value,
         }
-        for key, value in display_devices.items()
+        for key, value in hass.data[DOMAIN].get("browser_ids", {}).items()
     ]
 
 
@@ -198,14 +209,13 @@ async def get_dashboard_options_schema(
         }
 
     # Get the overlay options
-    installed_dashboard = await hass.data[DOMAIN][ASSETS_MANAGER].get_installed_version(
+    installed_dashboard = await AssetsManager.get(hass).get_installed_version(
         AssetClass.DASHBOARD, "dashboard"
     )
     if AwesomeVersion(installed_dashboard) >= MIN_DASHBOARD_FOR_OVERLAYS:
         available_overlays = await hass.async_add_executor_job(
             get_available_overlays, hass
         )
-        _LOGGER.debug("Overlay options: %s", available_overlays)
         overlay_options = [
             {"value": key, "label": value} for key, value in available_overlays.items()
         ]
@@ -345,7 +355,10 @@ DEFAULT_OPTIONS_SCHEMA = vol.Schema(
 )
 
 INTEGRATION_OPTIONS_SCHEMA = vol.Schema(
-    {vol.Optional(CONF_ENABLE_UPDATES): BooleanSelector()}
+    {
+        vol.Optional(CONF_ENABLE_UPDATES): BooleanSelector(),
+        vol.Optional(CONF_TRANSLATION_ENGINE): ConversationAgentSelector(),
+    }
 )
 
 
@@ -445,14 +458,32 @@ class ViewAssistConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_options(self, user_input=None):
         """Handle the options step."""
         if user_input is not None:
+            # Auto populate config parameters if VACA device
+            if self.type == VAType.VACA:
+                device_id = user_input.pop(CONF_DEVICE)
+                user_input = user_input | get_vaca_config(self.hass, device_id)
+
             # Include the type in the data to save in the config entry
             user_input[CONF_TYPE] = self.type
+
             return self.async_create_entry(
                 title=user_input.get(CONF_NAME, DEFAULT_NAME), data=user_input
             )
 
         # Define the schema based on the selected type
-        if self.type == VAType.VIEW_AUDIO:
+        if self.type == VAType.VACA:
+            # Special simple VACA setup
+            data_schema = vol.Schema(
+                {
+                    vol.Required(CONF_NAME): str,
+                    vol.Required(CONF_DEVICE): DeviceSelector(
+                        DeviceSelectorConfig(
+                            integration=VACA_DOMAIN,
+                        )
+                    ),
+                }
+            )
+        elif self.type == VAType.VIEW_AUDIO:
             data_schema = BASE_DEVICE_SCHEMA.extend(
                 {
                     vol.Required(CONF_DISPLAY_DEVICE): SelectSelector(
@@ -497,7 +528,7 @@ class ViewAssistOptionsFlowHandler(OptionsFlow):
         # Also need to be in strings.json and translation files.
         self.va_type = self.config_entry.data[CONF_TYPE]  # pylint: disable=attribute-defined-outside-init
 
-        if self.va_type == VAType.VIEW_AUDIO:
+        if self.va_type in DISPLAY_DEVICE_TYPES:
             return self.async_show_menu(
                 step_id="init",
                 menu_options=["main_config", "dashboard_options", "default_options"],
@@ -526,7 +557,7 @@ class ViewAssistOptionsFlowHandler(OptionsFlow):
             )
             return self.async_create_entry(data=None)
 
-        if self.va_type == VAType.VIEW_AUDIO:
+        if self.va_type in DISPLAY_DEVICE_TYPES:
             data_schema = BASE_DEVICE_SCHEMA.extend(
                 {
                     vol.Required(CONF_DISPLAY_DEVICE): SelectSelector(
@@ -611,7 +642,12 @@ class ViewAssistOptionsFlowHandler(OptionsFlow):
 
         data_schema = self.add_suggested_values_to_schema(
             INTEGRATION_OPTIONS_SCHEMA,
-            get_suggested_option_values(self.config_entry),
+            {
+                CONF_ENABLE_UPDATES: self.config_entry.options.get(CONF_ENABLE_UPDATES),
+                CONF_TRANSLATION_ENGINE: self.config_entry.options.get(
+                    CONF_TRANSLATION_ENGINE
+                ),
+            },
         )
 
         if user_input is not None:
