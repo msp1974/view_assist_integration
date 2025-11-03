@@ -22,9 +22,24 @@ _LOGGER = logging.getLogger(__name__)
 
 CONF_INTENT = "intent"
 
+
+def has_one_non_empty_item(value: list[str]) -> list[str]:
+    """Validate result has at least one item."""
+    if len(value) < 1:
+        raise vol.Invalid("at least one intent is required")
+
+    for intent in value:
+        if not intent:
+            raise vol.Invalid("empty intent found in list")
+
+    return value
+
+
 _OPTIONS_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_INTENT): cv.string,
+        vol.Required(CONF_INTENT): vol.All(
+            cv.ensure_list, [cv.string], has_one_non_empty_item
+        ),
         vol.Optional(CONF_COMMAND): cv.string,
     }
 )
@@ -136,7 +151,7 @@ class VAIntentTrigger(Trigger):
             )
             self._unregister = im.register_trigger(
                 IntentTriggerDetails(
-                    intent=self._options[CONF_INTENT],
+                    intents=self._options[CONF_INTENT],
                     command=command,
                     callback=async_on_event,
                 )

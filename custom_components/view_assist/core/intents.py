@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 class IntentTriggerDetails:
     """List of commands and the callback for a trigger."""
 
-    intent: str
+    intents: list[str]
     command: str | None
     callback: Callable[..., Awaitable[None]]
 
@@ -57,7 +57,7 @@ class IntentsManager:
         """Initialise."""
         self.hass = hass
         self.config = config
-        self.triggers: dict[str, Callable[..., Awaitable[None]]] = {}
+        self.triggers: list[IntentTriggerDetails] = []
 
     async def async_setup(self) -> bool:
         """Set up the Intents Manager."""
@@ -96,15 +96,12 @@ class IntentsManager:
 
     def register_trigger(self, trigger: IntentTriggerDetails) -> Callable:
         """Register a trigger."""
-        trigger_name = (
-            f"{trigger.intent}_{trigger.command}" if trigger.command else trigger.intent
-        )
-        self.triggers[trigger_name] = trigger.callback
+        self.triggers.append(trigger)
 
         @callback
         def unregister_trigger() -> None:
             """Unregister the trigger."""
-            self.triggers.pop(trigger_name, None)
+            self.triggers.remove(trigger)
 
         return unregister_trigger
 
@@ -112,18 +109,33 @@ class IntentsManager:
         self, intent_obj: Intent
     ) -> IntentTriggerResponse | None:
         """Process triggers for a given intent."""
-        trigger_name = (
-            f"{intent_obj.intent_type}_{intent_obj.slots[CONF_COMMAND]['value']}"
-            if intent_obj.slots.get(CONF_COMMAND)
-            else intent_obj.intent_type
-        )
-        _LOGGER.debug("Looking for trigger: %s", trigger_name)
-        if trigger_name in self.triggers:
-            _LOGGER.debug("Processing triggers for intent: %s", trigger_name)
-            extra_data = await self.get_trigger_extra_data(intent_obj)
-            result = await self.triggers[trigger_name](intent_obj, extra_data)
-            _LOGGER.debug("Trigger result: %s", result)
-            return result
+        if intent_obj.slots and "command" in intent_obj.slots:
+            _LOGGER.debug(
+                "Looking for trigger: %s -> %s",
+                intent_obj.intent_type,
+                intent_obj.slots["command"]["value"],
+            )
+        else:
+            _LOGGER.debug("Looking for trigger: %s", intent_obj.intent_type)
+
+        for trigger in self.triggers:
+            _LOGGER.debug("Checking trigger: %s", trigger)
+            if intent_obj.intent_type in trigger.intents:
+                command_match = trigger.command == "" or (
+                    intent_obj.slots
+                    and "command" in intent_obj.slots
+                    and intent_obj.slots["command"]["value"] == trigger.command
+                )
+                if command_match:
+                    _LOGGER.debug(
+                        "Processing triggers for intent: %s with command: %s",
+                        intent_obj.intent_type,
+                        trigger.command,
+                    )
+                    extra_data = await self.get_trigger_extra_data(intent_obj)
+                    result = await trigger.callback(intent_obj, extra_data)
+                    _LOGGER.debug("Trigger result: %s", result)
+                    return result
         return None
 
     async def get_trigger_extra_data(self, intent_obj: Intent) -> dict[str, Any]:
