@@ -598,7 +598,7 @@ class EntityStateChangedHandler:
                     }
                 )
                 self._update_sensor_entity(updates)
-                if navigation_manager and word_count > 1:
+                if navigation_manager:
                     navigation_manager.browser_navigate("view-assist/info")
 
     @callback
