@@ -316,6 +316,7 @@ class AssetsManager:
             if version_info := await manager.async_get_version_info(update_from_repo):
                 for name, versions in version_info.items():
                     self.data[asset_class][name] = versions
+
                     # Fire update entity update event if asset is installed or new asset
                     self._fire_updates_update(
                         asset_class,
@@ -324,6 +325,19 @@ class AssetsManager:
                         if versions["installed"]
                         else False,
                     )
+
+                # Remove entries no longer in the repo
+                registered_assets = list(self.data[asset_class].keys())
+                for asset in registered_assets.copy():
+                    if asset not in version_info:
+                        _LOGGER.debug(
+                            "Removing %s %s as no longer in repo",
+                            asset_class,
+                            asset,
+                        )
+                        self.data[asset_class].pop(asset)
+                        # Fire update entity remove event
+                        self._fire_updates_update(asset_class, asset, remove=True)
 
             await self.store.update(asset_class, None, self.data[asset_class])
         _LOGGER.debug("Latest versions updated")
