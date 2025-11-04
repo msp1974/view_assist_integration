@@ -739,18 +739,24 @@ class ViewAssist {
       const processingDiv = styleDiv.querySelector(`[id="processing"]`);
       const respondingDiv = styleDiv.querySelector(`[id="responding"]`);
 
-      const divs = {"listening": listeningDiv, "processing": processingDiv, "responding": respondingDiv};
+      const divs = { "listening": listeningDiv, "processing": processingDiv, "responding": respondingDiv };
+
+      if (state in divs) {
+        styleDiv.style.display = "block";
+      } else {
+        styleDiv.style.display = "none";
+      }
+
 
       Object.entries(divs).forEach(([id, div]) => {
-        console.log("Checking div: ", id, " against state: ", state);
-        if (id == state) {
-          div.classList.add("active");
-          div.style.display = "block";
-          styleDiv.style.display = "block";
-        } else {
-          div.classList.remove("active");
-          div.style.display = "none";
-          styleDiv.style.display = "none";
+        if (div != null) {
+          if (id == state) {
+            div.classList.add("active");
+            div.style.display = "block";
+          } else {
+            div.classList.remove("active");
+            div.style.display = "none";
+          }
         }
       });
 
