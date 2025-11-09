@@ -29,8 +29,10 @@ from ..const import (  # noqa: TID252
     CYCLE_VIEWS,
     DEVICES,
     DOMAIN,
+    ESPHOME_DOMAIN,
     HASSMIC_DOMAIN,
     MIN_DASHBOARD_FOR_OVERLAYS,
+    MUSIC_ASSISTANT_DOMAIN,
     VACA_DOMAIN,
     VAMode,
 )
@@ -81,7 +83,7 @@ class EntityListeners:
 
         return True
 
-    async def async_unload(self) -> None:
+    async def async_unload(self) -> bool:
         """Stop the EntityListeners."""
         return True
 
@@ -94,17 +96,19 @@ class AssistEntityListenerHandler:
         self.hass = hass
         self.config = config
         self.mic_integration = get_config_entry_by_entity_id(
-            hass, config.runtime_data.core.mic_device
+            hass, config.runtime_data.core.mic_device or ""
         ).domain
         self.music_player_entity = config.runtime_data.core.musicplayer_device
-        self.music_player_volume: float | None = None
+        self.music_player_volume: float = 0.0
+        self.is_ducked: bool = False
+        self.ducking_task: asyncio.Task | None = None
 
     def register_listeners(self) -> None:
         """Register the state change listener for assist/mic status entities."""
 
         if self.mic_integration == HASSMIC_DOMAIN:
             assist_entity_id = get_hassmic_pipeline_status_entity_id(
-                self.hass, self.config.runtime_data.core.mic_device
+                self.hass, self.config.runtime_data.core.mic_device or ""
             )
         else:
             assist_entity_id = self.config.runtime_data.core.mic_device
@@ -126,30 +130,32 @@ class AssistEntityListenerHandler:
         """Handle state change event for assist/mic status entities."""
         if not event.data.get("new_state"):
             return
+        new_state: State | None = event.data["new_state"]
+        old_state: State | None = event.data.get("old_state")
 
-        entity_id = event.data["new_state"].entity_id
+        entity_id = new_state.entity_id if new_state else "unknown"
 
         # If not change to mic state, exit function
-        if (
-            not event.data.get("old_state")
-            or not event.data.get("new_state")
-            or event.data["old_state"].state == event.data["new_state"].state
-        ):
+        if not old_state or not new_state or old_state.state == new_state.state:
             return
 
         _LOGGER.debug(
             "Mic state change: %s: %s->%s",
             entity_id,
-            event.data["old_state"].state,
-            event.data["new_state"].state,
+            old_state.state,
+            new_state.state,
         )
 
         # Display listening/processing overlays, if supported
-        await self.do_overlay_event(event.data["new_state"].state)
+        await self.do_overlay_event(new_state.state)
 
         # Volume ducking
-        await self.do_volume_ducking(
-            event.data["old_state"].state, event.data["new_state"].state
+        if self.ducking_task and not self.ducking_task.done():
+            self.ducking_task.cancel()
+        self.ducking_task = self.config.async_create_background_task(
+            self.hass,
+            self.do_volume_ducking(old_state.state, new_state.state),
+            name="VA Volume Ducking Task",
         )
 
     async def do_volume_ducking(self, old_state: str, new_state: str) -> None:
@@ -157,23 +163,41 @@ class AssistEntityListenerHandler:
         # Volume ducking
         try:
             music_player_integration = get_config_entry_by_entity_id(
-                self.hass, self.music_player_entity
+                self.hass, self.music_player_entity or ""
             ).domain
         except AttributeError:
             return
 
+        _LOGGER.debug(
+            "Performing volume ducking.  Mic is %s, music player is %s",
+            self.mic_integration,
+            music_player_integration,
+        )
+
+        # If device supports onboard ducking, skip
         if self.mic_integration in (
-            "esphome",
+            ESPHOME_DOMAIN,
             VACA_DOMAIN,
-        ) and music_player_integration in ("esphome", VACA_DOMAIN):
+        ) and music_player_integration in (
+            ESPHOME_DOMAIN,
+            VACA_DOMAIN,
+            MUSIC_ASSISTANT_DOMAIN,
+        ):
             # HA VPE and VACA have built in volume ducking support
+            _LOGGER.debug(
+                "Skipping volume ducking as both mic and music player have built-in support"
+            )
             return
 
-        if (
-            self.hass.states.get(self.music_player_entity).state
-            != MediaPlayerState.PLAYING
-        ):
-            return
+        # Only proceed if music player is playing
+        if self.music_player_entity:
+            entity_state = self.hass.states.get(self.music_player_entity)
+            if entity_state and entity_state.state != MediaPlayerState.PLAYING:
+                _LOGGER.debug(
+                    "Music player %s is not playing, skipping volume ducking",
+                    self.music_player_entity,
+                )
+                return
 
         if (
             self.mic_integration == HASSMIC_DOMAIN and old_state == "wake_word-start"
@@ -186,15 +210,22 @@ class AssistEntityListenerHandler:
             # Ducking volume is a % of current volume of mediaplayer
             ducking_percent = self.config.runtime_data.default.ducking_volume
 
-            if music_player_volume := self.hass.states.get(
+            if (
                 self.music_player_entity
-            ).attributes.get("volume_level"):
+                and (mp_state := self.hass.states.get(self.music_player_entity))
+                and (music_player_volume := mp_state.attributes.get("volume_level"))
+                is not None
+            ):
                 _LOGGER.debug("Current music player volume: %s", music_player_volume)
+
                 # Set current volume for restoring later
-                self.music_player_volume = music_player_volume
+                if not self.is_ducked:
+                    self.music_player_volume = float(music_player_volume or 0)
 
                 # Calculate media player volume for ducking
-                ducking_volume = music_player_volume * ((100 - ducking_percent) / 100)
+                ducking_volume = self.music_player_volume * (
+                    (100 - (ducking_percent or 0)) / 100
+                )
 
                 if self.music_player_volume > ducking_volume:
                     _LOGGER.debug("Ducking music player volume to: %s", ducking_volume)
@@ -206,6 +237,7 @@ class AssistEntityListenerHandler:
                             "volume_level": ducking_volume,
                         },
                     )
+                    self.is_ducked = True
 
             else:
                 _LOGGER.debug(
@@ -214,39 +246,50 @@ class AssistEntityListenerHandler:
                 return
 
         elif (
-            (self.mic_integration == HASSMIC_DOMAIN and new_state == "wake_word-start")
-            or (
-                self.mic_integration != HASSMIC_DOMAIN
-                and new_state == AssistSatelliteState.IDLE
+            self.is_ducked
+            and self.music_player_volume > 0
+            and (
+                (
+                    self.mic_integration == HASSMIC_DOMAIN
+                    and new_state == "wake_word-start"
+                )
+                or (
+                    self.mic_integration != HASSMIC_DOMAIN
+                    and new_state == AssistSatelliteState.IDLE
+                )
             )
-        ) and self.music_player_volume is not None:
-            if self.hass.states.get(self.music_player_entity):
+        ):
+            if self.music_player_entity and self.hass.states.get(
+                self.music_player_entity
+            ):
                 await asyncio.sleep(1)
                 _LOGGER.debug(
                     "Restoring music player volume: %s", self.music_player_volume
                 )
+
                 # Restore gradually to avoid sudden volume change
-                current_music_player_volume = self.hass.states.get(
-                    self.music_player_entity
-                ).attributes.get("volume_level")
-                for i in range(1, 11):
-                    volume = min(
-                        self.music_player_volume,
-                        current_music_player_volume + (i * 0.1),
+                if music_player_state := self.hass.states.get(self.music_player_entity):
+                    current_music_player_volume = music_player_state.attributes.get(
+                        "volume_level"
                     )
-                    await self.hass.services.async_call(
-                        "media_player",
-                        "volume_set",
-                        {
-                            "entity_id": self.music_player_entity,
-                            "volume_level": volume,
-                        },
-                        blocking=True,
-                    )
-                    if volume == self.music_player_volume:
-                        break
-                    await asyncio.sleep(0.25)
-                self.music_player_volume = None
+                    for i in range(1, 11):
+                        volume = min(
+                            self.music_player_volume,
+                            (current_music_player_volume or 0) + (i * 0.1),
+                        )
+                        await self.hass.services.async_call(
+                            "media_player",
+                            "volume_set",
+                            {
+                                "entity_id": self.music_player_entity,
+                                "volume_level": volume,
+                            },
+                            blocking=True,
+                        )
+                        if volume == self.music_player_volume:
+                            self.is_ducked = False
+                            break
+                        await asyncio.sleep(0.25)
 
     async def do_overlay_event(self, state: str) -> None:
         """Trigger overlay update."""
