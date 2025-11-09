@@ -32,7 +32,6 @@ from ..const import (  # noqa: TID252
     ESPHOME_DOMAIN,
     HASSMIC_DOMAIN,
     MIN_DASHBOARD_FOR_OVERLAYS,
-    MUSIC_ASSISTANT_DOMAIN,
     VACA_DOMAIN,
     VAMode,
 )
@@ -181,7 +180,6 @@ class AssistEntityListenerHandler:
         ) and music_player_integration in (
             ESPHOME_DOMAIN,
             VACA_DOMAIN,
-            MUSIC_ASSISTANT_DOMAIN,
         ):
             # HA VPE and VACA have built in volume ducking support
             _LOGGER.debug(
