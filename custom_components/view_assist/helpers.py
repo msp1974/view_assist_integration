@@ -457,19 +457,26 @@ def get_available_overlays(hass: HomeAssistant) -> dict[str, str]:
     """Get available overlays for pipeline listening, processing, etc."""
     # Read the HTML file
     overlays = {}
-    path = hass.config.path(DOMAIN, DASHBOARD_DIR, f"{OVERLAY_FILE_NAME}.html")
-    if Path(path).exists():
-        content = Path(path).read_text(encoding="utf-8")
+    paths = [hass.config.path(DOMAIN, DASHBOARD_DIR, f"{OVERLAY_FILE_NAME}.html")]
+    custom_path = hass.config.path(
+        DOMAIN, "custom_overlays", f"{OVERLAY_FILE_NAME}.html"
+    )
+    if Path(custom_path).exists():
+        paths.append(custom_path)
 
-        # Parse the HTML content
-        soup = BeautifulSoup(content, "html.parser")
+    for path in paths:
+        if Path(path).exists():
+            content = Path(path).read_text(encoding="utf-8")
 
-        # Print the href attribute of each link
-        for div in soup.find_all("div", recursive=False):
-            o_id = div.get("id")
-            name = div.get("data-name")
-            if o_id and name:
-                overlays[o_id] = name
+            # Parse the HTML content
+            soup = BeautifulSoup(content, "html.parser")
+
+            # Print the href attribute of each link
+            for div in soup.find_all("div", recursive=False):
+                o_id = div.get("id")
+                name = div.get("data-name")
+                if o_id and name:
+                    overlays[o_id] = name
     if overlays:
         return overlays
     return {}

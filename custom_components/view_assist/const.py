@@ -45,6 +45,8 @@ DASHBOARD_ICONS = [
 BROWSERMOD_DOMAIN = "browser_mod"
 REMOTE_ASSIST_DISPLAY_DOMAIN = "remote_assist_display"
 CUSTOM_CONVERSATION_DOMAIN = "custom_conversation"
+MUSIC_ASSISTANT_DOMAIN = "music_assistant"
+ESPHOME_DOMAIN = "esphome"
 HASSMIC_DOMAIN = "hassmic"
 VACA_DOMAIN = "vaca"
 USE_VA_NAVIGATION_FOR_BROWSERMOD = True
@@ -58,7 +60,7 @@ JSMODULES = [
     {
         "name": "View Assist Helper",
         "filename": "view_assist.js",
-        "version": "1.0.22",
+        "version": "1.0.23",
     },
 ]
 # mins between checks for updated versions of dashboard and views

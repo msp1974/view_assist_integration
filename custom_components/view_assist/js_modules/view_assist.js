@@ -1,6 +1,6 @@
-import { timerCards } from "./timers.js?v=1.0.22";
+import { timerCards } from "./timers.js?v=1.0.23";
 
-const version = "1.0.22"
+const version = "1.0.23"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 export async function await_element(el, hard = false) {
@@ -703,6 +703,27 @@ class ViewAssist {
       return;
     }
     st.innerHTML = await css_response.text();
+
+    // Add custom overlays html/css
+    try {
+      // Load custom overlays html
+      const response = await fetch("/view_assist/custom_overlays/overlay.html");
+      if (response.ok) {
+        const custom_html = await response.text();
+        htmlElement.shadowRoot.innerHTML += custom_html;
+
+        // Load custom css
+        const custom_css = await fetch("/view_assist/custom_overlays/overlay.css");
+        if (custom_css.ok) {
+          st.innerHTML += await custom_css.text();
+        }
+      } else {
+        console.log("Custom overlays not implemented");
+      }
+    } catch (error) {
+      // No custom html
+    }
+
     htmlElement.shadowRoot.appendChild(st);
   }
 
@@ -716,22 +737,29 @@ class ViewAssist {
       const styleDiv = overlays.querySelector(`[id=${style}]`);
       const listeningDiv = styleDiv.querySelector(`[id="listening"]`);
       const processingDiv = styleDiv.querySelector(`[id="processing"]`);
+      const respondingDiv = styleDiv.querySelector(`[id="responding"]`);
 
-      switch (state) {
-        case "listening":
-          listeningDiv.style.display = "block";
-          processingDiv.style.display = "none";
-          styleDiv.style.display = "block";
-          break;
-        case "processing":
-          listeningDiv.style.display = "none";
-          processingDiv.style.display = "block";
-          styleDiv.style.display = "block";
-          break;
-        default:
-          styleDiv.style.display = "none";
-          break;
+      const divs = { "listening": listeningDiv, "processing": processingDiv, "responding": respondingDiv };
+
+      if (state in divs) {
+        styleDiv.style.display = "block";
+      } else {
+        styleDiv.style.display = "none";
       }
+
+
+      Object.entries(divs).forEach(([id, div]) => {
+        if (div != null) {
+          if (id == state) {
+            div.classList.add("active");
+            div.style.display = "block";
+          } else {
+            div.classList.remove("active");
+            div.style.display = "none";
+          }
+        }
+      });
+
     } catch (e) {
       console.log("Error showing overlay for style: ", style, "with action: ", state, "\n", e);
       return;
