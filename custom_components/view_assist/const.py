@@ -29,18 +29,6 @@ WIKI_URL = "https://dinki.github.io/View-Assist"
 
 DEFAULT_VIEW = "clock"
 CYCLE_VIEWS = ["music", "info", "weather", "clock"]
-DASHBOARD_ICONS = [
-    "mic",
-    "hold",
-    "cycle",
-    "dnd",
-    "weather",
-    "home",
-    "camera",
-    "wake",
-    "menu",
-    "timer",
-]
 
 BROWSERMOD_DOMAIN = "browser_mod"
 REMOTE_ASSIST_DISPLAY_DOMAIN = "remote_assist_display"
