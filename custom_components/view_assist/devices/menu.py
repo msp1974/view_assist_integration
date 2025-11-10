@@ -20,7 +20,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import slugify
 
-from ..const import DASHBOARD_ICONS, DEVICES, DOMAIN  # noqa: TID252
+from ..const import DEVICES, DOMAIN  # noqa: TID252
 from ..helpers import get_config_entry_by_entity_id  # noqa: TID252
 from ..typed import VAConfigEntry, VAEvent, VAEventType, VAMenuConfig  # noqa: TID252
 
@@ -90,9 +90,7 @@ class MenuManager:
 
         d = self.config.runtime_data.dashboard.display_settings
 
-        self._internal_status_icons = [
-            icon for icon in d.status_icons.copy() if icon in DASHBOARD_ICONS
-        ]
+        self._internal_status_icons = list(d.status_icons.copy())
         self._internal_menu_items = [
             item
             for item in d.menu_items.copy()
@@ -109,7 +107,7 @@ class MenuManager:
         MenuManagerServices(self.hass).register()
         return True
 
-    async def async_unload(self) -> None:
+    async def async_unload(self) -> bool:
         """Stop the MenuManager."""
         return True
 
@@ -247,7 +245,7 @@ class MenuManager:
     def _add_remove_status_item(self, icon: str, add: bool) -> None:
         """Add or remove a status item."""
         if add:
-            if icon in DASHBOARD_ICONS and icon not in self._internal_status_icons:
+            if icon not in self._internal_status_icons:
                 self._internal_status_icons.append(icon)
                 _LOGGER.debug("Added status icon %s to %s", icon, self.name)
         elif icon in self._internal_status_icons:
