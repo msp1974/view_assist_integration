@@ -33,6 +33,10 @@ This integration can be installed by downloading the [view_assist](https://githu
 
 Questions, problems, concerns?  Reach out to us on Discord or use the 'Issues' above
 
+## View Assist Companion App
+
+We strongly suggest Android users use our [View Assist Companion App](https://github.com/msp1974/ViewAssist_Companion_App) in conjunction with the View Assist Integration.  This app greatly simplifies the process of get things goiung.  Follow the link for more information.
+
 # Help
 
 Need help?  Check our [View Assist Wiki](https://dinki.github.io/View-Assist/) for the most up-to-date documentation.  You can also hop on our [View Assist Discord Server](https://discord.gg/3WXXfGAf8T) and we'll give you a boost!
