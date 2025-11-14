@@ -1,6 +1,6 @@
-import { timerCards } from "./timers.js?v=1.0.23";
+import { timerCards } from "./timers.js?v=1.0.24";
 
-const version = "1.0.23"
+const version = "1.0.24"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 export async function await_element(el, hard = false) {
@@ -741,7 +741,7 @@ class ViewAssist {
 
       const divs = { "listening": listeningDiv, "processing": processingDiv, "responding": respondingDiv };
 
-      if (state in divs) {
+      if (state in divs && divs[state] != null) {
         styleDiv.style.display = "block";
       } else {
         styleDiv.style.display = "none";
