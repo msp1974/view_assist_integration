@@ -29,18 +29,6 @@ WIKI_URL = "https://dinki.github.io/View-Assist"
 
 DEFAULT_VIEW = "clock"
 CYCLE_VIEWS = ["music", "info", "weather", "clock"]
-DASHBOARD_ICONS = [
-    "mic",
-    "hold",
-    "cycle",
-    "dnd",
-    "weather",
-    "home",
-    "camera",
-    "wake",
-    "menu",
-    "timer",
-]
 
 BROWSERMOD_DOMAIN = "browser_mod"
 REMOTE_ASSIST_DISPLAY_DOMAIN = "remote_assist_display"
@@ -60,7 +48,7 @@ JSMODULES = [
     {
         "name": "View Assist Helper",
         "filename": "view_assist.js",
-        "version": "1.0.23",
+        "version": "1.0.24",
     },
 ]
 # mins between checks for updated versions of dashboard and views
