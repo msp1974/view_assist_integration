@@ -94,16 +94,21 @@ class AssistEntityListenerHandler:
         """Initialise."""
         self.hass = hass
         self.config = config
-        self.mic_integration = get_config_entry_by_entity_id(
-            hass, config.runtime_data.core.mic_device or ""
-        ).domain
+        self.mic_integration = None
         self.music_player_entity = config.runtime_data.core.musicplayer_device
         self.music_player_volume: float = 0.0
         self.is_ducked: bool = False
         self.ducking_task: asyncio.Task | None = None
 
+        if mic_device := get_config_entry_by_entity_id(
+            hass, config.runtime_data.core.mic_device
+        ):
+            self.mic_integration = mic_device.domain
+
     def register_listeners(self) -> None:
         """Register the state change listener for assist/mic status entities."""
+        if not self.mic_integration:
+            return
 
         if self.mic_integration == HASSMIC_DOMAIN:
             assist_entity_id = get_hassmic_pipeline_status_entity_id(
