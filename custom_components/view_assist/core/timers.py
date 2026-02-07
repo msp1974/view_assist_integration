@@ -1109,7 +1109,9 @@ class TimerManagerServices:
             else:
                 raise vol.InInvalid("entity_id or device_id is required")
 
-        extra_info = {"sentence": sentence}
+        extra_info = {
+            "sentence": sentence.replace("-", " ")
+        }  # Google STT can add - in interval sentence.
         if extra_data:
             extra_info.update(extra_data)
 

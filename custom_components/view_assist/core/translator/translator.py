@@ -37,6 +37,9 @@ class LangPackKeys2(StrEnum):
     DECIMAL_SEPARATOR = "decimal_separator"
 
 
+CLEAN_SYMBOLS = ["-", "_"]
+
+
 PROJECT_ID = environ.get("PROJECT_ID", "")
 
 
@@ -175,6 +178,11 @@ class TimeSentenceTranslator:
     def clean_sentence(self, s: str) -> str:
         """Preprocess sentence to remove and replace words/text/symbols."""
         s = f" {s.lower().strip()} "
+
+        # Remove unwanted symbols - fix for Goolge STT hyphenating interval times like 5-minutes
+        for sym in CLEAN_SYMBOLS:
+            s = s.replace(sym, " ")
+
         # Replace decimal separator with .
         if sep := self.lang.get(LangPackKeys2.DECIMAL_SEPARATOR):
             pattern = rf"(\d+){re.escape(sep)}(\d+)"
