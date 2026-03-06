@@ -1084,12 +1084,14 @@ class TimerManagerServices:
         extra_data = call.data.get(ATTR_EXTRA)
 
         if timer_type and str(timer_type).lower() in ["reminder", "alarm"]:
-            # TODO: What is this for?
-            timer_type = TimerClass.REMINDER
             time_type = "time"
         else:
             time_type = "interval"
-
+            
+        # Some STT add additional chars.  This removes those that add - or .
+        if timer_time:
+            timer_time = timer_time.replace("-", "").replace(".", "")
+        
         sentence, timer_info = await self.decode_time_sentence(
             timer_time, language=language, time_type=time_type
         )
