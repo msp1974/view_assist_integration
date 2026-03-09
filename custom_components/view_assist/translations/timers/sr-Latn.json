@@ -1,0 +1,120 @@
+{
+  "decimal_separator": ",",
+  "numbers": {
+    "zero": "nula",
+    "one": ["jedan","jedna"],
+    "two": "dva",
+    "three": "tri",
+    "four": "četiri",
+    "five": "pet",
+    "six": "šest",
+    "seven": "sedam",
+    "eight": "osam",
+    "nine": "devet",
+    "ten": "deset",
+    "eleven": "jedanaest",
+    "twelve": "dvanaest",
+    "thirteen": "trinaest",
+    "fourteen": "četrnaest",
+    "fifteen": "petnaest",
+    "sixteen": "šesnaest",
+    "seventeen": "sedamnaest",
+    "eighteen": "osamnaest",
+    "nineteen": "devetnaest",
+    "twenty": "dvadeset",
+    "twenty one": "dvadeset jedan",
+    "thirty": "trideset",
+    "forty": "četrdeset",
+    "fifty": "pedeset",
+    "sixty": "šezdeset",
+    "seventy": "sedamdeset",
+    "eighty": "osamdeset",
+    "ninety": "devedeset"
+  },
+  "days": {
+    "monday": "ponedeljak",
+    "tuesday": "utorak",
+    "wednesday": "sreda",
+    "thursday": "četvrtak",
+    "friday": "petak",
+    "saturday": "subota",
+    "sunday": "nedelja",
+    "today": "danas",
+    "tomorrow": "sutra"
+  },
+  "durations": {
+    "days": ["dana", "dan"],
+    "hours": ["sati", "sat"],
+    "minutes": ["minuta", "minut"],
+    "seconds": ["sekundi", "sekunda"],
+    "quarter of an hour": ["četvrt sata"],
+    "half an hour": ["pola sata"],
+    "three quarters of an hour": ["tri četvrtine sata"]
+  },
+  "operators": {
+    "before": ["pre"],
+    "after": ["posle"],
+    "plus": ["plus"],
+    "minus": ["minus"]
+  },
+  "time_of_day": {
+    "morning": ["ujutru"],
+    "noon": ["podne"],
+    "afternoon": ["popodne"],
+    "evening": ["uveče"],
+    "night": ["noću"],
+    "midnight": ["ponoć"],
+    "tonight": ["večeras"]
+  },
+  "fractions": {
+    "oclock": [],
+    "half": ["pola"],
+    "quarter": ["četvrt"],
+    "threequarters": ["tri četvrtine"]
+  },
+  "other_words": {
+    "and": ["i"],
+    "the": ["ta", "taj", "te"],
+    "of": ["od"],
+    "in": ["u"],
+    "at": ["u", "na"],
+    "this": ["ovaj", "ova", "ovo"],
+    "on": ["na"]
+  },
+  "direct_translations": {},
+  "structures": {
+    "basic_time": [
+      "{hours} sati",
+      "{hours} sati {time_of_day}",
+      "{hours} sati {minutes}",
+      "{hours} sati {minutes} {time_of_day}",
+      "{hours} sati {operator} {fractions}",
+      "{hours} sati {operator} {fractions} {time_of_day}",
+      "{hours} sati {operator} {minutes}",
+      "{hours} sati {operator} {minutes} {time_of_day}"
+    ],
+    "advanced_time": [
+      "{day} {basic_time}",
+      "{day} u {basic_time}",
+      "{day}, {basic_time}"
+    ],
+    "basic_interval": [
+      "{days} dana i {fractions}",
+      "{hours} sati i {fractions}",
+      "{minutes} minuta i {fractions}",
+      "{hours}h00 i {minutes} minuta"
+    ],
+    "advanced_interval": []
+  },
+  "responses": {
+    "timer_set": "Tajmer podešen na {time}",
+    "timer_named_set": "Tajmer {name} podešen na {time}",
+    "timer_already_exists": "Tajmer sa imenom {name} već postoji",
+    "timer_none": "Нема подешених тајмера",
+    "timer_list": "Imate sledeće podešene tajmere: {timers}",
+    "timer_deleted": "Tajmer {name} obrisan",
+    "timer_not_found": "Tajmer sa imenom {name} nije pronađen",
+    "timer_remaining": "Preostalo je {remaining} na tajmeru {name}",
+    "timer_error": "Nije moguće dekodirati informacije o vremenu ili intervalu"
+  }
+}
