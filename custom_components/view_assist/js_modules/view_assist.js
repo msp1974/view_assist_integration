@@ -1,6 +1,6 @@
-import { timerCards } from "./timers.js?v=1.0.25";
+import { timerCards } from "./timers.js?v=1.0.26";
 
-const version = "1.0.25"
+const version = "1.0.26"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 export async function await_element(el, hard = false) {
@@ -651,9 +651,24 @@ class ViewAssist {
     this.variables.config = payload
 
     if (!payload.mimic_device) {
-      // On register, go to default page
+      // On register, only force home when we are at a neutral path.
+      // This prevents registered events from overriding explicit navigation
+      // (for example, an idle-triggered screensaver path).
       if (reload) {
-        this.browser_navigate(payload.home);
+        const currentPath = window.location.pathname || "";
+        const homePath = payload.home || "/view-assist/clock";
+        const atNeutralPath =
+          currentPath === "/" ||
+          currentPath === "/auth/authorize" ||
+          currentPath === homePath;
+        if (atNeutralPath) {
+          this.browser_navigate(homePath);
+        } else {
+          console.debug(
+            "ViewAssist - registered event keeping current path:",
+            currentPath
+          );
+        }
       }
     }
   }
