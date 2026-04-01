@@ -73,8 +73,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: VAConfigEntry):
 
 async def _async_update_listener(hass: HomeAssistant, config_entry: VAConfigEntry):
     """Handle config options update."""
-    # Reload the integration when the options change.
+    # Reload the updated entry when options change.
     hass.config_entries.async_schedule_reload(config_entry.entry_id)
+
+    # Dashboard options on the master entry flow down into every device entry.
+    # Reload those entries too so runtime dashboard paths stay in sync.
+    if config_entry.data[CONF_TYPE] == VAType.MASTER_CONFIG:
+        for entry in get_integration_entries(hass):
+            if entry.entry_id != config_entry.entry_id:
+                hass.config_entries.async_schedule_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: VAConfigEntry):

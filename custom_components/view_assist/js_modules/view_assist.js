@@ -677,12 +677,18 @@ class ViewAssist {
   }
 
   process_config(event, payload) {
-    let reload = false;
-    const old_config = this.variables?.config
+      let reload = false;
+      const old_config = this.variables?.config
+      const currentPath = window.location.pathname || "";
+      const previousHomePath =
+        old_config?.home ||
+        localStorage.getItem("view_assist_home") ||
+        "/view-assist/clock";
+      const homePath = payload.home || "/view-assist/clock";
 
-    if (event == "registered") {
-      reload = true;
-    }
+      if (event == "registered") {
+        reload = true;
+      }
 
     // Entity id changed
     if (payload.entity_id && payload.entity_id != localStorage.getItem("view_assist_sensor")) {
@@ -691,30 +697,53 @@ class ViewAssist {
       reload = true;
     }
 
-    // Set variables to payload
-    this.variables.config = payload
+      // Set variables to payload
+      this.variables.config = payload
+      localStorage.setItem("view_assist_home", homePath);
 
-    if (!payload.mimic_device) {
-      // On register, only force home when we are at a neutral path.
-      // This prevents registered events from overriding explicit navigation
-      // (for example, an idle-triggered screensaver path).
-      if (reload) {
-        const currentPath = window.location.pathname || "";
-        const homePath = payload.home || "/view-assist/clock";
-        const atNeutralPath =
-          currentPath === "/" ||
-          currentPath === "/auth/authorize" ||
-          currentPath === homePath;
-        if (atNeutralPath) {
-          this.browser_navigate(homePath);
-        } else {
+      if (
+        !payload.mimic_device &&
+        previousHomePath !== homePath &&
+        currentPath === previousHomePath
+      ) {
           console.debug(
-            "ViewAssist - registered event keeping current path:",
-            currentPath
-          );
+            "ViewAssist - home path changed, navigating current home path:",
+          previousHomePath,
+          "->",
+          homePath
+        );
+        this.browser_navigate(homePath);
+        return;
+      }
+
+      if (!payload.mimic_device) {
+        // On register, only force home when we are at a neutral path.
+        // This prevents registered events from overriding explicit navigation
+        // (for example, an idle-triggered screensaver path).
+        if (reload) {
+          const atNeutralPath =
+            currentPath === "/" ||
+            currentPath === "/auth/authorize" ||
+            currentPath === homePath;
+          const atInternalViewAssistPath =
+            currentPath.startsWith("/view-assist/") &&
+            currentPath !== homePath;
+          if (atNeutralPath || atInternalViewAssistPath) {
+            console.debug(
+              "ViewAssist - registered event syncing path:",
+              currentPath,
+              "->",
+              homePath
+            );
+            this.browser_navigate(homePath);
+          } else {
+            console.debug(
+              "ViewAssist - registered event keeping current path:",
+              currentPath
+            );
+          }
         }
       }
-    }
   }
 
   async set_time_delta() {
