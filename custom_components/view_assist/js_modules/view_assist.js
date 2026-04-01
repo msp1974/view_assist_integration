@@ -523,20 +523,49 @@ class ViewAssist {
   }
 
   get_browser_id() {
-    // Create a browser id if not already set
-    if (!localStorage.getItem("view_assist_browser_id")) {
-      // Test if VA Companion App is installed and get uuid from that
-      let browser_id = '';
-      try {
-        browser_id = `va-${ViewAssistApp.getViewAssistCAUUID()}`;
-      } catch (e) {
-        const s4 = () => { return Math.floor((1 + Math.random()) * 100000).toString(16).substring(1); };
-        browser_id = `va-${s4()}${s4()}-${s4()}${s4()}`
+    const native_browser_id = this.get_native_browser_id();
+    const stored_browser_id = localStorage.getItem("view_assist_browser_id");
+
+    // If running inside the companion app, always prefer the stable app UUID.
+    // This repairs stale/random browser IDs left behind by unhealthy sessions.
+    if (native_browser_id) {
+      if (stored_browser_id !== native_browser_id) {
+        console.debug(
+          "ViewAssist - replacing stale browser id",
+          stored_browser_id,
+          "with native id",
+          native_browser_id
+        );
+        localStorage.setItem("view_assist_browser_id", native_browser_id);
+        localStorage.removeItem("view_assist_status");
+        localStorage.removeItem("view_assist_sensor");
+        localStorage.removeItem("view_assist_mimic_device");
       }
+      return native_browser_id;
+    }
+
+    // Outside the companion app, keep the browser-local id.
+    if (!stored_browser_id) {
+      const s4 = () => { return Math.floor((1 + Math.random()) * 100000).toString(16).substring(1); };
+      const browser_id = `va-${s4()}${s4()}-${s4()}${s4()}`
       localStorage.setItem("view_assist_browser_id", browser_id);
       return browser_id
     }
-    return localStorage.getItem("view_assist_browser_id");
+    return stored_browser_id;
+  }
+
+  get_native_browser_id() {
+    try {
+      if (typeof ViewAssistApp !== "undefined" && ViewAssistApp.getViewAssistCAUUID) {
+        const uuid = ViewAssistApp.getViewAssistCAUUID();
+        if (uuid) {
+          return `va-${uuid}`;
+        }
+      }
+    } catch (e) {
+      // No native app bridge available; fall back to browser-local ID.
+    }
+    return null;
   }
 
   async connect(attempts = 1) {
@@ -606,6 +635,21 @@ class ViewAssist {
         this.variables.config = {};
         this.variables.registered = false;
         await this.hide_sections(this.variables.registered);
+        {
+          const native_browser_id = this.get_native_browser_id();
+          if (native_browser_id && this.variables.browser_id !== native_browser_id) {
+            console.debug(
+              "ViewAssist - unregistered stale browser id, healing to native id:",
+              this.variables.browser_id,
+              "->",
+              native_browser_id
+            );
+            localStorage.setItem("view_assist_browser_id", native_browser_id);
+            this.variables.browser_id = native_browser_id;
+            setTimeout(() => this.connect(), 1000);
+            break;
+          }
+        }
         setTimeout(() => this. display_browser_id(), 2000);
         break;
       case "config_update":
