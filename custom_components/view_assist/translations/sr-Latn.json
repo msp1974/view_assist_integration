@@ -1,0 +1,271 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Uređaj je već konfigurisan",
+      "reconfigure_successful": "Ponavljena konfiguracija je uspešna",
+      "already_in_progress": "Podešavanje za ovu integraciju je već u toku"
+    },
+    "error": {
+      "cannot_connect": "Neuspešno povezivanje",
+      "invalid_auth": "Neispravna autentikacija",
+      "invalid_settings": "Neispravna podešavanja",
+      "unknown": "Neočekivana greška"
+    },
+    "step": {
+      "master_config": {
+        "title": "Master konfiguracija",
+        "description": "Ovo dodaje master instancu konfiguracije za View Assist\n\n Mora biti dodata pre nego što podesite bilo koje View Assist uređaje ako je nova instalacija ili pre dodavanja dodatnih View Assist uređaja ako je postojeća instalacija\n\n Možda ćete morati da osvežite postojeće View Assist uređaje da biste omogućili punu funkcionalnost"
+      },
+      "options": {
+        "title": "Konfigurišite View Assist uređaj",
+        "data": {
+          "name": "Ime satelita",
+          "mic_device": "Mikrofon uređaj",
+          "mediaplayer_device": "Medija plejer uređaj",
+          "musicplayer_device": "Muzički plejer uređaj",
+          "display_device": "Uređaj za prikaz",
+          "intent_device": "Intent uređaj (opciono)",
+          "orientation_sensor": "Senzor orijentacije (opciono)",
+          "dev_mimic": "Imitirani uređaj za razvoj prikaza"
+        },
+        "data_description": {
+          "name": "Ime View Assist satelita",
+          "mic_device": "Mikrofon uređaj za ovaj satelit",
+          "mediaplayer_device": "Medija plejer uređaj za ovaj satelit",
+          "musicplayer_device": "Muzički plejer uređaj za ovaj satelit",
+          "display_device": "Uređaj za prikaz za ovaj satelit",
+          "intent_device": "Uređaj koji obezbeđuje intent podatke za ovaj satelit",
+          "orientation_sensor": "Senzor koji prijavljuje orijentaciju uređaja (portret/pejzaž)",
+          "dev_mimic": "Koristite ovaj uređaj za razvoj prikaza na drugom računaru"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Konfiguracija",
+        "description": "Izaberite koje opcije želite da izmenite",
+        "menu_options": {
+          "integration_options": "Opcije integracije",
+          "main_config": "Osnovna konfiguracija uređaja",
+          "dashboard_options": "Opcije kontrolne table",
+          "default_options": "Podrazumevane opcije",
+          "developer_options": "Opcije za programere"
+        }
+      },
+      "main_config": {
+        "title": "{name} Osnovna konfiguracija uređaja",
+        "description": "",
+        "data": {
+          "name": "Ime satelita",
+          "mic_device": "Mikrofon uređaj",
+          "mediaplayer_device": "Medija plejer uređaj",
+          "musicplayer_device": "Muzički plejer uređaj",
+          "display_device": "Uređaj za prikaz",
+          "intent_device": "Intent uređaj (opciono)",
+          "orientation_sensor": "Senzor orijentacije (opciono)",
+          "dev_mimic": "Mimik za razvoj prikaza"
+        },
+        "data_description": {
+          "name": "Ime View Assist satelita",
+          "mic_device": "Mikrofon uređaj za ovaj satelit",
+          "mediaplayer_device": "Medija plejer uređaj za ovaj satelit",
+          "musicplayer_device": "Muzički plejer uređaj za ovaj satelit",
+          "intent_device": "Uređaj koji obezbeđuje intent podatke za ovaj satelit",
+          "orientation_sensor": "Senzor koji prijavljuje orijentaciju uređaja (portret/pejzaž)",
+          "display_device": "Uređaj za prikaz za ovaj satelit",
+          "dev_mimic": "Koristite ovaj uređaj za razvoj prikaza na drugom računaru"
+        }
+      },
+      "dashboard_options": {
+        "title": "{name} Opcije kontrolne table",
+        "description": "{description}",
+        "data": {
+          "dashboard": "Kontrolna tabla",
+          "home": "Početni ekran",
+          "music": "Muzički prikaz",
+          "intent": "Intent prikaz",
+          "list_view": "Prikaz liste"
+        },
+        "data_description": {
+          "dashboard": "Osnovna kontrolna tabla za View Assist (ne uključivati završnu kosu crtu)",
+          "home": "Ekran na koji se vraća nakon isteka vremena",
+          "music": "Prikaz na koji se vraća u muzičkom režimu",
+          "intent": "Prikaz koji se koristi za podrazumevane HA akcije za prikaz tih entiteta",
+          "list_view": "Prikaz koji se prikazuje prilikom ažuriranja liste"
+        },
+        "sections": {
+          "background_settings": {
+            "name": "Podešavanja pozadine",
+            "description": "Opcije za sliku pozadine",
+            "data": {
+              "background_mode": "Izvor slike pozadine",
+              "background": "Podrazumevana pozadina",
+              "rotate_background_path": "Putanja ili URL slike",
+              "rotate_background_linked_entity": "Povezani entitet",
+              "rotate_background_interval": "Interval rotiranja"
+            },
+            "data_description": {
+              "background": "URL podrazumevane slike pozadine",
+              "rotate_background_path": "Putanja unutar config/view_assist za učitavanje slika u lokalnim režimima fajlova. URL za učitavanje slika u URL režimu",
+              "rotate_background_linked_entity": "View Assist entitet za povezivanje pozadine",
+              "rotate_background_interval": "Interval u minutima za rotiranje pozadine"
+            }
+          },
+          "display_settings": {
+            "name": "Podešavanja prikaza",
+            "description": "Opcije za uređaj za prikaz",
+            "data": {
+              "assist_prompt": "Assist upit",
+              "font_style": "Stil fonta",
+              "status_icons_size": "Veličina ikone statusa",
+              "status_icons": "Ikone za pokretanje",
+              "menu_config": "Konfiguracija menija",
+              "menu_items": "Stavke menija",
+              "menu_timeout": "Tajmaut menija",
+              "time_format": "Format vremena",
+              "screen_mode": "Prikaži/sakrij zaglavlje i bočni meni",
+              "cycle_views": "Ciklični prikazi"
+            },
+            "data_description": {
+              "assist_prompt": "Stil Assist obaveštenja za detekciju reči za buđenje i obradu intenta",
+              "font_style": "Podrazumevani font za ovaj satelitski uređaj. Naziv fonta mora tačno da se poklapa i da bude dostupan",
+              "status_icons_size": "Veličina ikona u prikazu ikona statusa",
+              "status_icons": "Napredna opcija! Lista prilagođenih ikona za pokretanje koja se podešava pri pokretanju. Ne menjajte ako niste sigurni šta radite",
+              "menu_config": "Konfigurišite ponašanje menija",
+              "menu_items": "Lista stavki koje će se prikazati u meniju kada je aktiviran",
+              "menu_timeout": "Vreme u sekundama pre automatskog zatvaranja menija (0 za onemogućavanje)",
+              "time_format": "Postavlja format prikaza vremena",
+              "screen_mode": "Prikaži ili sakrij zaglavlje i bočni meni",
+              "cycle_views": "Lista stavki koje će se prikazivati u ciklus režimu"
+            }
+          }
+        }
+      },
+      "default_options": {
+        "title": "{name} Podrazumevane opcije",
+        "description": "{description}",
+        "data": {
+          "weather_entity": "Entitet vremena za prikaz prognoze",
+          "mic_type": "Integracija koja obrađuje ulaz sa mikrofona",
+          "mode": "Podrazumevani režim",
+          "view_timeout": "Tajmaut prikaza",
+          "do_not_disturb": "Omogući Ne uznemiravaj pri pokretanju",
+          "use_announce": "Onemogući najave na ovom uređaju",
+          "micunmute": "Uključi mikrofon pri pokretanju/restartu HA",
+          "ducking_volume": "Procenat smanjenja jačine zvuka",
+          "music_mode_auto": "Automatski muzički režim",
+          "music_mode_timeout": "Tajmaut muzičkog režima"
+        },
+        "data_description": {
+          "mode": "Podrazumevani režim za ovaj satelitski uređaj",
+          "view_timeout": "Podrazumevana vrednost tajmauta u sekundama pre povratka na podrazumevani prikaz",
+          "do_not_disturb": "Podrazumevano stanje Ne uznemiravaj pri restartu HA",
+          "use_announce": "Neki media playeri, kao BrowserMod, ne mogu da koriste Home Assistant announce funkciju dok mediji sviraju. Ova opcija omogućava isključivanje announce poruka ako nastanu problemi. Podrazumevano je uključeno.",
+          "micunmute": "Korisno za Stream Assist uređaje",
+          "ducking_volume": "Smanji jačinu medija za ovaj procenat kada je Assist aktivan",
+          "music_mode_auto": "Automatski uđi u muzički režim kada muzički plejer počne reprodukciju",
+          "music_mode_timeout": "Vreme u sekundama pre automatskog izlaska iz muzičkog režima nakon zaustavljanja muzike (0 = onemogućeno)"
+        }
+      },
+      "integration_options": {
+        "title": "{name} Opcije integracije",
+        "data": {
+          "enable_updates": "Omogući obaveštenja o ažuriranjima",
+          "translation_engine": "Prevodilačka mašina"
+        },
+        "data_description": {
+          "enable_updates": "Omogućite ili onemogućite obaveštenja o ažuriranjima za kontrolnu tablu, prikaze i šablone",
+          "translation_engine": "Prevodilačka mašina koja se koristi za tajmere (eksperimentalno)"
+        }
+      },
+      "developer_options": {
+        "title": "{name} Opcije za programere",
+        "data": {
+          "developer_device": "Uređaj za razvoj",
+          "developer_mimic_device": "Uređaj za imitiranje"
+        },
+        "data_description": {
+          "developer_device": "Browser ID uređaja koji želite da koristite za razvoj",
+          "developer_mimic_device": "Uređaj koji će se imitirati za razvoj"
+        }
+      }
+    }
+  },
+  "selector": {
+    "type_selector": {
+      "options": {
+        "vaca": "View Assist Companion App uređaj",
+        "view_audio": "View Assist uređaj sa prikazom",
+        "audio_only": "View Assist uređaj bez prikaza"
+      }
+    },
+    "assist_prompt_selector": {
+      "options": {
+        "blur_pop_up": "Zamućuje ekran i prikazuje iskačući prozor",
+        "flashing_bar": "Treptajuća traka na dnu",
+        "kitt_bar": "KITT stil trake na dnu"
+      }
+    },
+    "status_icons_size_selector": {
+      "options": {
+        "6vw": "Mala",
+        "7vw": "Srednja",
+        "8vw": "Velika"
+      }
+    },
+    "menu_config_selector": {
+      "options": {
+        "menu_disabled": "Meni onemogućen",
+        "menu_enabled_button_visible": "Meni omogućen, dugme vidljivo",
+        "menu_enabled_button_hidden": "Meni omogućen, dugme skriveno"
+      }
+    },
+    "mic_type_selector": {
+      "options": {
+        "home_assistant_voice_satellite": "Home Assistant Voice Satellite",
+        "hassmic": "HassMic",
+        "stream_assist": "Stream Assist"
+      }
+    },
+    "display_type_selector": {
+      "options": {
+        "browser_mod": "BrowserMod",
+        "remote_assist_display": "Remote Assist Display",
+        "stream_assist": "Stream Assist"
+      }
+    },
+    "rotate_backgound_source_selector": {
+      "options": {
+        "default_background": "Podrazumevana pozadina",
+        "local_sequence": "Sekvencijalna slika iz lokalne putanje",
+        "local_random": "Slučajna slika iz lokalne putanje",
+        "download": "Slučajna slika sa unsplash.com",
+        "custom_url": "Slika sa prilagođenog URL-a",
+        "link_to_entity": "Ogledalo drugog View Assist uređaja"
+      }
+    },
+    "menu_icons_selector": {
+      "options": {}
+    },
+    "lookup_selector": {
+      "options": {
+        "hour_12": "12 sati",
+        "hour_24": "24 sata",
+        "on": "Uključeno",
+        "off": "Isključeno",
+        "hide_header_sidebar": "Sakrij zaglavlje i bočni meni",
+        "hide_header": "Sakrij zaglavlje",
+        "hide_sidebar": "Sakrij bočni meni",
+        "no_hide": "Ne sakrivaj elemente"
+      }
+    }
+  },
+  "issues": {
+    "no_resource_version": {
+      "title": "Rešite probleme sa verzijom resursa View Assist",
+      "description": "Pomoćni plugin View Assist resursa nema identifikator verzije. Ovo može uzrokovati da se ne koristi najnovija verzija. Uklonite resurs i ponovo pokrenite Home Assistant da biste rešili problem."
+    }
+  }
+}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from asyncio import Task
 import logging
+import time
 
 import voluptuous as vol
 
@@ -12,7 +13,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, selector
 from homeassistant.helpers.dispatcher import async_dispatcher_send, callback
 
-from ..const import ATTR_DEVICE, DEVICES, DOMAIN, VAMode  # noqa: TID252
+from ..const import ATTR_DEVICE, DEVICES, DOMAIN, VACA_DOMAIN, VAMode  # noqa: TID252
 from ..helpers import (  # noqa: TID252
     get_config_entry_by_entity_id,
     get_revert_settings_for_mode,
@@ -29,7 +30,9 @@ NAVIGATE_SERVICE_SCHEMA = vol.Schema(
             selector.EntitySelectorConfig(integration=DOMAIN)
         ),
         vol.Required(ATTR_PATH): str,
-        vol.Optional(ATTR_REVERT_TIMEOUT, default=20): cv.positive_int,
+        vol.Optional(ATTR_REVERT_TIMEOUT, default=20): vol.All(
+            vol.Coerce(int), vol.Range(min=0)
+        ),
     }
 )
 
@@ -58,6 +61,8 @@ class NavigationManager:
         self.revert_view_task: Task | None = None
         self.cycle_view_task: Task | None = None
         self.revert_timeout = config.runtime_data.default.view_timeout
+        self._last_vaca_forward_path: str = ""
+        self._last_vaca_forward_ts: float = 0.0
 
     async def async_setup_once(self) -> bool:
         """Set up navigation manager services that should only be registered once."""
@@ -76,6 +81,32 @@ class NavigationManager:
         """Unload the last instance of NavigationManager."""
         NavigationManagerServices(self.hass).unregister()
         return True
+
+    def _normalize_timeout(
+        self, timeout: int | float | str | None, default: int | None = None
+    ) -> int | None:
+        """Normalize timeout values coming from service data or internal callers."""
+        if timeout is None:
+            return default
+        try:
+            normalized = int(timeout)
+        except (TypeError, ValueError):
+            _LOGGER.warning(
+                "Invalid revert timeout %r for %s; using %s",
+                timeout,
+                self.config.runtime_data.core.name,
+                default,
+            )
+            return default
+        if normalized < 0:
+            _LOGGER.warning(
+                "Negative revert timeout %r for %s; using %s",
+                timeout,
+                self.config.runtime_data.core.name,
+                default,
+            )
+            return default
+        return normalized
 
     def browser_navigate(
         self,
@@ -109,12 +140,20 @@ class NavigationManager:
 
         # Update current_path attribute
         self.config.runtime_data.extra_data["current_path"] = path
-        
+
         # Notify sensor entity to update (triggers schedule_update_ha_state)
         async_dispatcher_send(
             self.hass,
             f"{DOMAIN}_{self.config.entry_id}_event",
             VAEvent(VAEventType.CONFIG_UPDATE),
+        )
+
+        # Resolve timeout now so it can be used for both VACA payload and revert scheduling.
+        requested_timeout = self._normalize_timeout(timeout, default=None)
+        effective_timeout = (
+            self.config.runtime_data.default.view_timeout
+            if requested_timeout is None
+            else requested_timeout
         )
 
         # Send navigation event to VA JS Helper
@@ -124,41 +163,102 @@ class NavigationManager:
             VAEvent(VAEventType.NAVIGATION, {"path": path}),
         )
 
+        # For VACA devices, also forward navigation through the VACA Wyoming
+        # channel so the companion app can wake/exit screensaver and navigate.
+        self._forward_navigation_to_vaca(
+            path,
+            is_revert_action=is_revert_action,
+            revert_timeout=effective_timeout,
+        )
+
         # If this was a revert action, end here
         if is_revert_action:
             return
 
         # If timeout set to 0, do not revert
-        if timeout == 0:
+        if requested_timeout == 0:
             return
 
-        # Find required revert action
-        revert, revert_view = get_revert_settings_for_mode(
-            self.config.runtime_data.default.mode
-        )
-        if (
-            revert_view == "home"
-            and self.config.runtime_data.runtime_config_overrides.home
-        ):
-            revert_path = self.config.runtime_data.runtime_config_overrides.home
+        # If we have a hold path, revert to that instead of the default revert path
+        if hold_path := self.config.runtime_data.extra_data.get("hold_path"):
+            _LOGGER.debug("Using hold path for revert: %s", hold_path)
+            revert = True
+            revert_path = self.config.runtime_data.extra_data["hold_path"]
         else:
-            revert_path = (
-                getattr(self.config.runtime_data.dashboard, revert_view)
-                if revert_view
-                else None
+            # Find required revert action
+            revert, revert_view = get_revert_settings_for_mode(
+                self.config.runtime_data.default.mode
             )
+            if (
+                revert_view == "home"
+                and self.config.runtime_data.runtime_config_overrides.home
+            ):
+                revert_path = self.config.runtime_data.runtime_config_overrides.home
+            else:
+                revert_path = (
+                    getattr(self.config.runtime_data.dashboard, revert_view)
+                    if revert_view
+                    else None
+                )
 
         # Set revert action if required
         if revert and path != revert_path:
-            timeout = (
-                self.config.runtime_data.default.view_timeout
-                if timeout is None
-                else timeout
-            )
+            timeout = effective_timeout
             _LOGGER.debug("Adding revert to %s in %ss", revert_path, timeout)
             self.revert_view_task = self.hass.async_create_task(
                 self._display_revert_delay_task(path=revert_path, timeout=timeout)
             )
+
+    def _forward_navigation_to_vaca(
+        self,
+        path: str,
+        is_revert_action: bool = False,
+        revert_timeout: int | None = None,
+    ) -> None:
+        """Forward navigation action to VACA integration when applicable."""
+        try:
+            mic_entity_id = self.config.runtime_data.core.mic_device or ""
+            mic_entry = get_config_entry_by_entity_id(self.hass, mic_entity_id)
+            if not mic_entry or mic_entry.domain != VACA_DOMAIN:
+                return
+
+            vaca_data = self.hass.data.get(VACA_DOMAIN, {})
+            vaca_item = vaca_data.get(mic_entry.entry_id)
+            vaca_device = getattr(vaca_item, "device", None)
+            if vaca_device is None:
+                _LOGGER.debug("VACA device unavailable for navigation forward")
+                return
+
+            now = time.monotonic()
+            if (
+                self._last_vaca_forward_path == path
+                and (now - self._last_vaca_forward_ts) < 2.0
+            ):
+                _LOGGER.debug(
+                    "Skipping duplicate VACA navigation forward path=%s dt=%.3fs",
+                    path,
+                    now - self._last_vaca_forward_ts,
+                )
+                return
+
+            # Wake first for direct navigations so screensaver can be exited cleanly.
+            if not is_revert_action:
+                vaca_device.send_custom_action("screen-wake")
+            payload: dict[str, int | str] = {"path": path}
+            if is_revert_action:
+                payload["revert_timeout"] = 0
+            elif revert_timeout is not None:
+                payload["revert_timeout"] = int(revert_timeout)
+            vaca_device.send_custom_action("navigate", payload)
+            self._last_vaca_forward_path = path
+            self._last_vaca_forward_ts = now
+            _LOGGER.debug(
+                "Forwarded navigation to VACA: %s (revert_timeout=%s)",
+                path,
+                revert_timeout,
+            )
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.warning("Failed to forward navigation to VACA: %s", ex)
 
     def navigate_home(self):
         """Navigate browser to home view."""
@@ -175,8 +275,9 @@ class NavigationManager:
 
     async def _display_revert_delay_task(self, path: str, timeout: int = 0):
         """Display revert function.  To be called from task."""
-        if timeout:
-            await asyncio.sleep(timeout)
+        normalized_timeout = self._normalize_timeout(timeout, default=0)
+        if normalized_timeout:
+            await asyncio.sleep(normalized_timeout)
             self.browser_navigate(path=path, is_revert_action=True)
 
     def cancel_display_revert_task(self):
@@ -229,6 +330,7 @@ class NavigationManagerServices:
             DOMAIN,
             "navigate",
             self._handle_navigate,
+            schema=NAVIGATE_SERVICE_SCHEMA,
         )
 
     def unregister(self):
