@@ -6,8 +6,15 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_TYPE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import discovery_flow
+from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN
+from .const import (
+    CONF_DISPLAY_DEVICE,
+    CONF_MEDIAPLAYER_DEVICE,
+    CONF_MIC_DEVICE,
+    CONF_MUSICPLAYER_DEVICE,
+    DOMAIN,
+)
 from .core import CoreManager
 from .data import set_runtime_data_for_config
 from .devices import DeviceManager
@@ -16,6 +23,56 @@ from .migration import async_migrate_view_assist_config_entry
 from .typed import VAConfigEntry, VAType
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _repair_stale_vaca_entity_ids(
+    hass: HomeAssistant, entry: VAConfigEntry
+) -> VAConfigEntry:
+    """Repair stale VACA entity ids after a tablet reinstall changes its UUID."""
+    display_device = entry.data.get(CONF_DISPLAY_DEVICE) or ""
+    if not display_device.startswith("va-"):
+        return entry
+
+    suffix = display_device.removeprefix("va-")
+    entity_registry = er.async_get(hass)
+    data = dict(entry.data)
+    updated = False
+
+    def resolve_entity(prefix: str) -> str | None:
+        candidates = sorted(
+            entity.entity_id
+            for entity in entity_registry.entities.values()
+            if entity.entity_id.startswith(prefix)
+        )
+        return candidates[0] if candidates else None
+
+    stale_mic = data.get(CONF_MIC_DEVICE)
+    if stale_mic and entity_registry.async_get(stale_mic) is None:
+        if mic_entity := resolve_entity(f"assist_satellite.vaca_{suffix}"):
+            data[CONF_MIC_DEVICE] = mic_entity
+            updated = True
+
+    stale_media = data.get(CONF_MEDIAPLAYER_DEVICE)
+    if stale_media and entity_registry.async_get(stale_media) is None:
+        if media_entity := resolve_entity(f"media_player.vaca_{suffix}"):
+            data[CONF_MEDIAPLAYER_DEVICE] = media_entity
+            updated = True
+
+    stale_music = data.get(CONF_MUSICPLAYER_DEVICE)
+    if stale_music and entity_registry.async_get(stale_music) is None:
+        if music_entity := resolve_entity(f"media_player.vaca_{suffix}"):
+            data[CONF_MUSICPLAYER_DEVICE] = music_entity
+            updated = True
+
+    if updated:
+        _LOGGER.info(
+            "Repairing stale VACA entity ids for %s using display device %s",
+            entry.title,
+            display_device,
+        )
+        hass.config_entries.async_update_entry(entry, data=data)
+
+    return entry
 
 
 def migrate_to_section(entry: VAConfigEntry, params: list[str]):
@@ -54,6 +111,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: VAConfigEntry):
             )
             return True
         return False
+
+    if entry.data[CONF_TYPE] != VAType.MASTER_CONFIG:
+        entry = _repair_stale_vaca_entity_ids(hass, entry)
 
     # Set runtime data
     set_runtime_data_for_config(hass, entry, is_master_entry)
