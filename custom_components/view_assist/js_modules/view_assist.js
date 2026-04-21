@@ -1,6 +1,6 @@
-import { timerCards } from "./timers.js?v=1.0.25";
+import { timerCards } from "./timers.js?v=1.0.27";
 
-const version = "1.0.25"
+const version = "1.0.27"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 export async function await_element(el, hard = false) {
@@ -523,20 +523,25 @@ class ViewAssist {
   }
 
   get_browser_id() {
-    // Create a browser id if not already set
-    if (!localStorage.getItem("view_assist_browser_id")) {
-      // Test if VA Companion App is installed and get uuid from that
-      let browser_id = '';
-      try {
-        browser_id = `va-${ViewAssistApp.getViewAssistCAUUID()}`;
-      } catch (e) {
-        const s4 = () => { return Math.floor((1 + Math.random()) * 100000).toString(16).substring(1); };
-        browser_id = `va-${s4()}${s4()}-${s4()}${s4()}`
-      }
-      localStorage.setItem("view_assist_browser_id", browser_id);
-      return browser_id
+    let updateBrowserId = ''
+    const storedBrowserId = localStorage.getItem("view_assist_browser_id");
+    let vaca_browser_id = '';
+    try {
+      vaca_browser_id = `va-${ViewAssistApp.getViewAssistCAUUID()}`;
+    } catch (e) { }
+
+    if (vaca_browser_id && vaca_browser_id != storedBrowserId) {
+      updateBrowserId = vaca_browser_id;
+    } else if (!storedBrowserId) {
+      const s4 = () => { return Math.floor((1 + Math.random()) * 100000).toString(16).substring(1); };
+      updateBrowserId = `va-${s4()}${s4()}-${s4()}${s4()}`;
     }
-    return localStorage.getItem("view_assist_browser_id");
+
+    if (updateBrowserId) {
+      localStorage.setItem("view_assist_browser_id", updateBrowserId);
+      return updateBrowserId;
+    }
+    return storedBrowserId;
   }
 
   async connect(attempts = 1) {
