@@ -148,6 +148,17 @@ class WebsocketListenerHandler:
                 f"{DOMAIN}_{self.config.entry_id}_event",
                 VAEvent(VAEventType.BROWSER_REGISTERED),
             )
+            current_path = self.config.runtime_data.extra_data.get("current_path")
+            if not current_path:
+                current_path = (
+                    self.config.runtime_data.runtime_config_overrides.home
+                    if self.config.runtime_data.runtime_config_overrides.home
+                    else self.config.runtime_data.dashboard.home
+                )
+            if current_path:
+                self._send_event(
+                    VAEvent(VAEventType.NAVIGATION, {"path": current_path})
+                )
         else:
             self._send_event(
                 VAEvent(VAEventType.BROWSER_UNREGISTERED),

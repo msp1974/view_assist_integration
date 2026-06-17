@@ -103,6 +103,8 @@ class ViewAssistSensor(RestoreSensor):
                     "use_24_hour_time", "background", "mode", "view_timeout", 
                     "weather_entity", "screen_mode", "do_not_disturb", 
                     "use_announce",
+                    "home_screen",
+                    "current_path",
 
                     # Generated/ephemeral
                     "last_updated", "active_overrides",
