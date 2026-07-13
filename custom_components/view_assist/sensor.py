@@ -88,28 +88,46 @@ class ViewAssistSensor(RestoreSensor):
                 # These are rebuilt fresh on startup by their respective managers
                 system_managed_attrs = {
                     # Core entity properties (from config/runtime_data)
-                    "name", "type", "mic_device", "mic_device_id", "mute_switch",
-                    "display_device", "intent_device", "orientation_sensor",
-                    "mediaplayer_device", "musicplayer_device", "voice_device_id",
-
+                    "name",
+                    "type",
+                    "mic_device",
+                    "mic_device_id",
+                    "mute_switch",
+                    "display_device",
+                    "intent_device",
+                    "orientation_sensor",
+                    "mediaplayer_device",
+                    "musicplayer_device",
+                    "voice_device_id",
                     # Managed by MenuManager
-                    "status_icons", "menu_items", "menu_active",
-
+                    "status_icons",
+                    "menu_items",
+                    "menu_active",
                     # Managed by TimerManager (has its own storage)
                     "timers",
-
                     # From configuration/runtime_data
-                    "status_icons_size", "menu_config", "font_style", 
-                    "use_24_hour_time", "background", "mode", "view_timeout", 
-                    "weather_entity", "screen_mode", "do_not_disturb", 
+                    "status_icons_size",
+                    "menu_config",
+                    "font_style",
+                    "use_24_hour_time",
+                    "background",
+                    "mode",
+                    "view_timeout",
+                    "weather_entity",
+                    "screen_mode",
+                    "do_not_disturb",
                     "use_announce",
-
+                    "music_mode_auto",
+                    "music_mode_timeout",
                     # Generated/ephemeral
-                    "last_updated", "active_overrides",
-
+                    "last_updated",
+                    "active_overrides",
                     # Standard entity attributes
-                    "friendly_name", "icon", "device_class", 
-                    "unit_of_measurement", "state_class"
+                    "friendly_name",
+                    "icon",
+                    "device_class",
+                    "unit_of_measurement",
+                    "state_class",
                 }
 
                 # Restore user/automation-set attributes
@@ -125,7 +143,7 @@ class ViewAssistSensor(RestoreSensor):
                         "Restored %d custom attributes for %s: %s",
                         len(restored_extra_data),
                         self.entity_id,
-                        list(restored_extra_data.keys())
+                        list(restored_extra_data.keys()),
                     )
 
         # Add internal event listeners
@@ -279,8 +297,9 @@ class ViewAssistSensor(RestoreSensor):
             "view_timeout": d.default.view_timeout,
             "weather_entity": d.default.weather_entity,
             "screen_mode": d.dashboard.display_settings.screen_mode,
-            "home_screen": d.runtime_config_overrides.home if
-            d.runtime_config_overrides.home else d.dashboard.home,
+            "home_screen": d.runtime_config_overrides.home
+            if d.runtime_config_overrides.home
+            else d.dashboard.home,
         }
 
     def _get_active_overrides_attributes(self) -> dict[str, Any]:

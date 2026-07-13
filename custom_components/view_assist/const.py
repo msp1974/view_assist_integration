@@ -171,7 +171,7 @@ DEFAULT_VALUES = {
     CONF_USE_ANNOUNCE: "off",
     CONF_MIC_UNMUTE: "off",
     CONF_DUCKING_VOLUME: 70,
-    CONF_MUSIC_MODE_AUTO: False,
+    CONF_MUSIC_MODE_AUTO: "on",
     CONF_MUSIC_MODE_TIMEOUT: 300,
     # Default integration options
     CONF_ENABLE_UPDATES: True,

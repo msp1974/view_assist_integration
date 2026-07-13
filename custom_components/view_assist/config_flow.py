@@ -366,7 +366,13 @@ DEFAULT_OPTIONS_SCHEMA = vol.Schema(
                 mode=NumberSelectorMode.BOX,
             )
         ),
-        vol.Optional(CONF_MUSIC_MODE_AUTO): BooleanSelector(),
+        vol.Optional(CONF_MUSIC_MODE_AUTO): SelectSelector(
+            SelectSelectorConfig(
+                options=["on", "off"],
+                mode=SelectSelectorMode.DROPDOWN,
+                translation_key="lookup_selector",
+            )
+        ),
         vol.Optional(CONF_MUSIC_MODE_TIMEOUT): NumberSelector(
             NumberSelectorConfig(
                 min=0,
@@ -421,7 +427,7 @@ class ViewAssistConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for View Assist."""
 
     VERSION = 1
-    MINOR_VERSION = 5
+    MINOR_VERSION = 6
 
     @staticmethod
     @callback
