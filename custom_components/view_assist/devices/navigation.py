@@ -17,7 +17,7 @@ from ..helpers import (  # noqa: TID252
     get_config_entry_by_entity_id,
     get_revert_settings_for_mode,
 )
-from ..typed import VAConfigEntry, VAEvent, VAEventType  # noqa: TID252
+from ..typed import DISPLAY_DEVICE_TYPES, VAConfigEntry, VAEvent, VAEventType  # noqa: TID252
 
 ATTR_PATH = "path"
 ATTR_REVERT_TIMEOUT = "revert_timeout"
@@ -87,6 +87,10 @@ class NavigationManager:
 
         Optionally revert to another view after timeout.
         """
+
+        # If not a display device then return.  Allows navigation to be called from other devices (e.g. mic) without error
+        if self.config.runtime_data.core.type not in DISPLAY_DEVICE_TYPES:
+            return
 
         # If new navigate before revert timer has expired, cancel revert timer.
         if not is_revert_action:
