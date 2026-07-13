@@ -135,9 +135,6 @@ BASE_DEVICE_SCHEMA = vol.Schema(
         vol.Optional(CONF_INTENT_DEVICE, default=vol.UNDEFINED): EntitySelector(
             EntitySelectorConfig(domain=SENSOR_DOMAIN)
         ),
-        vol.Optional(CONF_ORIENTATION_SENSOR, default=vol.UNDEFINED): EntitySelector(
-            EntitySelectorConfig(domain=SENSOR_DOMAIN)
-        ),
     }
 )
 
@@ -514,12 +511,15 @@ class ViewAssistConfigFlow(ConfigFlow, domain=DOMAIN):
         elif self.type == VAType.VIEW_AUDIO:
             data_schema = BASE_DEVICE_SCHEMA.extend(
                 {
+                    vol.Optional(
+                        CONF_ORIENTATION_SENSOR, default=vol.UNDEFINED
+                    ): EntitySelector(EntitySelectorConfig(domain=SENSOR_DOMAIN)),
                     vol.Required(CONF_DISPLAY_DEVICE): SelectSelector(
                         SelectSelectorConfig(
                             options=get_display_devices(self.hass),
                             mode=SelectSelectorMode.DROPDOWN,
                         )
-                    )
+                    ),
                 }
             )
         else:  # audio_only
@@ -588,12 +588,15 @@ class ViewAssistOptionsFlowHandler(OptionsFlow):
         if self.va_type in DISPLAY_DEVICE_TYPES:
             data_schema = BASE_DEVICE_SCHEMA.extend(
                 {
+                    vol.Optional(
+                        CONF_ORIENTATION_SENSOR, default=vol.UNDEFINED
+                    ): EntitySelector(EntitySelectorConfig(domain=SENSOR_DOMAIN)),
                     vol.Required(CONF_DISPLAY_DEVICE): SelectSelector(
                         SelectSelectorConfig(
                             options=get_display_devices(self.hass, self.config_entry),
                             mode=SelectSelectorMode.DROPDOWN,
                         )
-                    )
+                    ),
                 }
             )
             data_schema = self.add_suggested_values_to_schema(
