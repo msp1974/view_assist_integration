@@ -380,11 +380,17 @@ def get_entities_by_attr_filter(
                     add_entity = False
                     if filter:
                         for attr, value in filter.items():
-                            if state.attributes.get(attr) == value:
+                            if isinstance(value, list):
+                                if state.attributes.get(attr) in value:
+                                    add_entity = True
+                            elif state.attributes.get(attr) == value:
                                 add_entity = True
                     if add_entity and exclude:
                         for attr, value in exclude.items():
-                            if state.attributes.get(attr) == value:
+                            if isinstance(value, list):
+                                if state.attributes.get(attr) in value:
+                                    add_entity = False
+                            elif state.attributes.get(attr) == value:
                                 add_entity = False
                     if add_entity:
                         matched_entities.append(entity.entity_id)
@@ -404,7 +410,7 @@ def get_key(
         else:
             dn_list = [dot_notation_path]
         return reduce(dict.get, dn_list, data)
-    except (TypeError, KeyError):
+    except TypeError, KeyError:
         return None
 
 
