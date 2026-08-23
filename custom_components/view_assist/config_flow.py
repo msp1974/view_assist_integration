@@ -123,6 +123,9 @@ BASE_DEVICE_SCHEMA = vol.Schema(
                     EntityFilterSelectorConfig(
                         integration=VACA_DOMAIN, domain=ASSIST_SAT_DOMAIN
                     ),
+                    EntityFilterSelectorConfig(
+                        integration="voice_satellite", domain=ASSIST_SAT_DOMAIN
+                    ),
                 ]
             )
         ),
