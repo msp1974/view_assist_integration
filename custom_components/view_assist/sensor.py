@@ -119,6 +119,7 @@ class ViewAssistSensor(RestoreSensor):
                     "use_announce",
                     "music_mode_auto",
                     "music_mode_timeout",
+                    "home_screen",
                     # Generated/ephemeral
                     "last_updated",
                     "active_overrides",
@@ -297,17 +298,13 @@ class ViewAssistSensor(RestoreSensor):
             "view_timeout": d.default.view_timeout,
             "weather_entity": d.default.weather_entity,
             "screen_mode": d.dashboard.display_settings.screen_mode,
-            "home_screen": d.runtime_config_overrides.home
-            if d.runtime_config_overrides.home
-            else d.dashboard.home,
+            "home_screen": d.runtime_config_overrides.home or d.dashboard.home,
         }
 
     def _get_active_overrides_attributes(self) -> dict[str, Any]:
         """Build active runtime override attributes dictionary."""
         d = self.config.runtime_data.runtime_config_overrides
         attrs = {}
-        if d.home is not None and d.home != "":
-            attrs["home"] = d.home
         if d.assist_prompt is not None and d.assist_prompt != "":
             attrs["assist_prompt"] = d.assist_prompt
         return attrs

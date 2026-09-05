@@ -12,7 +12,14 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, selector
 from homeassistant.helpers.dispatcher import async_dispatcher_send, callback
 
-from ..const import ATTR_DEVICE, DEVICES, DOMAIN, VAMode  # noqa: TID252
+from ..const import (
+    ATTR_DEVICE,
+    CONF_TIMERS,
+    DEVICES,
+    DOMAIN,
+    INTENT_TO_VIEW_MAPPING,
+    VAMode,
+)  # noqa: TID252
 from ..helpers import (  # noqa: TID252
     get_config_entry_by_entity_id,
     get_revert_settings_for_mode,
@@ -224,6 +231,20 @@ class NavigationManager:
             _LOGGER.debug("Stopping cycle display")
             self.cycle_view_task.cancel()
             self.cycle_view_task = None
+
+    def handle_intent_navigation(self, intent: str):
+        """Handle navigation intents."""
+        # Lookup intent in INTENT_TO_VIEW_MAPPING and get config item for view
+        # If found, navigate to that view
+        for view, intents in INTENT_TO_VIEW_MAPPING.items():
+            if intent in intents:
+                if path := getattr(self.config.runtime_data.dashboard, view):
+                    dashboard = self.config.runtime_data.dashboard.dashboard
+                    if dashboard and not path.startswith(dashboard):
+                        path = f"{dashboard}/{path}"
+                    if not path.startswith("/"):
+                        path = f"/{path}"
+                    self.browser_navigate(path=path)
 
 
 class NavigationManagerServices:

@@ -18,7 +18,6 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.selector import (
     BooleanSelector,
     ConversationAgentSelector,
-    ConversationAgentSelectorConfig,
     DeviceSelector,
     DeviceSelectorConfig,
     EntityFilterSelectorConfig,
@@ -70,6 +69,7 @@ from .const import (
     CONF_STATUS_ICON_SIZE,
     CONF_STATUS_ICONS,
     CONF_TIME_FORMAT,
+    CONF_TIMERS,
     CONF_TRANSLATION_ENGINE,
     CONF_USE_ANNOUNCE,
     CONF_VIEW_TIMEOUT,
@@ -229,14 +229,15 @@ async def get_dashboard_options_schema(
         _LOGGER.debug("No overlays available, using default options")
         overlay_options = [e.value for e in VAAssistPrompt]
 
-    BASE = {
+    BASE = {  # noqa: N806
         vol.Optional(CONF_DASHBOARD): str,
         vol.Optional(CONF_HOME): str,
+        vol.Optional(CONF_TIMERS): str,
         vol.Optional(CONF_MUSIC): str,
         vol.Optional(CONF_INTENT): str,
         vol.Optional(CONF_LIST): str,
     }
-    BACKGROUND_SETTINGS = {
+    BACKGROUND_SETTINGS = {  # noqa: N806
         vol.Optional(CONF_BACKGROUND_MODE): SelectSelector(
             SelectSelectorConfig(
                 translation_key="rotate_backgound_source_selector",
@@ -249,7 +250,7 @@ async def get_dashboard_options_schema(
         vol.Optional(CONF_ROTATE_BACKGROUND_INTERVAL): int,
     }
 
-    DISPLAY_SETTINGS = {
+    DISPLAY_SETTINGS = {  # noqa: N806
         vol.Optional(CONF_ASSIST_PROMPT): SelectSelector(
             SelectSelectorConfig(
                 translation_key="assist_prompt_selector",

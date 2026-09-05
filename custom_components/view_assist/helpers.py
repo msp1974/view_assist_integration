@@ -410,7 +410,7 @@ def get_key(
         else:
             dn_list = [dot_notation_path]
         return reduce(dict.get, dn_list, data)
-    except TypeError, KeyError:
+    except (TypeError, KeyError):
         return None
 
 
@@ -486,3 +486,8 @@ def get_available_overlays(hass: HomeAssistant) -> dict[str, str]:
     if overlays:
         return overlays
     return {}
+
+
+def normalize_name(name: str) -> str:
+    """Normalize name for comparison."""
+    return name.strip().casefold()
