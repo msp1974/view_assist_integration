@@ -18,7 +18,6 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.selector import (
     BooleanSelector,
     ConversationAgentSelector,
-    ConversationAgentSelectorConfig,
     DeviceSelector,
     DeviceSelectorConfig,
     EntityFilterSelectorConfig,
@@ -70,6 +69,7 @@ from .const import (
     CONF_STATUS_ICON_SIZE,
     CONF_STATUS_ICONS,
     CONF_TIME_FORMAT,
+    CONF_TIMERS,
     CONF_TRANSLATION_ENGINE,
     CONF_USE_ANNOUNCE,
     CONF_VIEW_TIMEOUT,
@@ -114,9 +114,6 @@ BASE_DEVICE_SCHEMA = vol.Schema(
             EntitySelectorConfig(domain=MEDIAPLAYER_DOMAIN)
         ),
         vol.Optional(CONF_INTENT_DEVICE, default=vol.UNDEFINED): EntitySelector(
-            EntitySelectorConfig(domain=SENSOR_DOMAIN)
-        ),
-        vol.Optional(CONF_ORIENTATION_SENSOR, default=vol.UNDEFINED): EntitySelector(
             EntitySelectorConfig(domain=SENSOR_DOMAIN)
         ),
     }
@@ -213,14 +210,15 @@ async def get_dashboard_options_schema(
         _LOGGER.debug("No overlays available, using default options")
         overlay_options = [e.value for e in VAAssistPrompt]
 
-    BASE = {
+    BASE = {  # noqa: N806
         vol.Optional(CONF_DASHBOARD): str,
         vol.Optional(CONF_HOME): str,
+        vol.Optional(CONF_TIMERS): str,
         vol.Optional(CONF_MUSIC): str,
         vol.Optional(CONF_INTENT): str,
         vol.Optional(CONF_LIST): str,
     }
-    BACKGROUND_SETTINGS = {
+    BACKGROUND_SETTINGS = {  # noqa: N806
         vol.Optional(CONF_BACKGROUND_MODE): SelectSelector(
             SelectSelectorConfig(
                 translation_key="rotate_backgound_source_selector",
@@ -233,7 +231,7 @@ async def get_dashboard_options_schema(
         vol.Optional(CONF_ROTATE_BACKGROUND_INTERVAL): int,
     }
 
-    DISPLAY_SETTINGS = {
+    DISPLAY_SETTINGS = {  # noqa: N806
         vol.Optional(CONF_ASSIST_PROMPT): SelectSelector(
             SelectSelectorConfig(
                 translation_key="assist_prompt_selector",
@@ -350,7 +348,13 @@ DEFAULT_OPTIONS_SCHEMA = vol.Schema(
                 mode=NumberSelectorMode.BOX,
             )
         ),
-        vol.Optional(CONF_MUSIC_MODE_AUTO): BooleanSelector(),
+        vol.Optional(CONF_MUSIC_MODE_AUTO): SelectSelector(
+            SelectSelectorConfig(
+                options=["on", "off"],
+                mode=SelectSelectorMode.DROPDOWN,
+                translation_key="lookup_selector",
+            )
+        ),
         vol.Optional(CONF_MUSIC_MODE_TIMEOUT): NumberSelector(
             NumberSelectorConfig(
                 min=0,
@@ -405,7 +409,7 @@ class ViewAssistConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for View Assist."""
 
     VERSION = 1
-    MINOR_VERSION = 5
+    MINOR_VERSION = 6
 
     @staticmethod
     @callback
@@ -495,12 +499,15 @@ class ViewAssistConfigFlow(ConfigFlow, domain=DOMAIN):
         elif self.type == VAType.VIEW_AUDIO:
             data_schema = BASE_DEVICE_SCHEMA.extend(
                 {
+                    vol.Optional(
+                        CONF_ORIENTATION_SENSOR, default=vol.UNDEFINED
+                    ): EntitySelector(EntitySelectorConfig(domain=SENSOR_DOMAIN)),
                     vol.Required(CONF_DISPLAY_DEVICE): SelectSelector(
                         SelectSelectorConfig(
                             options=get_display_devices(self.hass),
                             mode=SelectSelectorMode.DROPDOWN,
                         )
-                    )
+                    ),
                 }
             )
         else:  # audio_only
@@ -569,12 +576,15 @@ class ViewAssistOptionsFlowHandler(OptionsFlow):
         if self.va_type in DISPLAY_DEVICE_TYPES:
             data_schema = BASE_DEVICE_SCHEMA.extend(
                 {
+                    vol.Optional(
+                        CONF_ORIENTATION_SENSOR, default=vol.UNDEFINED
+                    ): EntitySelector(EntitySelectorConfig(domain=SENSOR_DOMAIN)),
                     vol.Required(CONF_DISPLAY_DEVICE): SelectSelector(
                         SelectSelectorConfig(
                             options=get_display_devices(self.hass, self.config_entry),
                             mode=SelectSelectorMode.DROPDOWN,
                         )
-                    )
+                    ),
                 }
             )
             data_schema = self.add_suggested_values_to_schema(

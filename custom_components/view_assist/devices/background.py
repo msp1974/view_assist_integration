@@ -10,6 +10,8 @@ import random
 
 import requests
 
+from homeassistant.components.media_player import SearchMediaQuery
+from homeassistant.components.media_source import helper as media_source_helpers
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
@@ -59,6 +61,8 @@ class BackgroundImageManager:
 
     async def async_setup(self) -> bool:
         """Load the device module."""
+
+        await ImageProvider.get_media_image(self.hass)  # Preload media images
 
         self.mode = (
             self.config.runtime_data.dashboard.background_settings.background_mode
@@ -335,3 +339,14 @@ class ImageProvider:
             return Path(image_list[next_index])
         except Exception as ex:  # noqa: BLE001
             _LOGGER.error("Error accessing path %s: %s", path, ex)
+
+    @staticmethod
+    async def get_media_image(
+        hass: HomeAssistant, save_path: str = IMAGE_PATH
+    ) -> Path | None:
+        """Get image from media."""
+        # results = media_source_helpers.async_search_media(hass, query=query)
+        media = await media_source_helpers.async_browse_media(
+            hass, "media-source://image"
+        )
+        _LOGGER.debug("Media search results: %s", media.as_dict())

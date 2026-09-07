@@ -113,7 +113,7 @@ class DeviceCoreConfig:
 
 @dataclass
 class BackgroundConfig:
-    "Background settings class."
+    """Background settings class."""
 
     background_mode: str | None = None
     background: str | None = None
@@ -144,6 +144,7 @@ class DashboardConfig:
 
     dashboard: str | None = None
     home: str | None = None
+    timers: str | None = None
     music: str | None = None
     intent: str | None = None
     list_view: str | None = None

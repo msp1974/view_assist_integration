@@ -1,7 +1,5 @@
 """View Assist websocket handlers."""
 
-from __future__ import annotations
-
 import logging
 import time
 from typing import Any
@@ -200,7 +198,7 @@ class WebsocketListenerHandler:
         # Send timers if timer event
         if event.event_name == VAEventType.TIMER_UPDATE:
             if timers := TimerManager.get(self.hass):
-                event.payload = timers.get_timers(
+                event.payload = timers.get_timers_as_dict(
                     entity_id=self.entity_id, include_expired=True
                 )
 
@@ -254,7 +252,7 @@ class WebsocketListenerHandler:
             data = config.runtime_data
             timer_info = {}
             if timers := TimerManager.get(self.hass):
-                timer_info = timers.get_timers(
+                timer_info = timers.get_timers_as_dict(
                     entity_id=self.entity_id, include_expired=True
                 )
 
@@ -402,7 +400,13 @@ def setup_websocket_commands(hass: HomeAssistant) -> None:
             timer_name = msg["name"]
             timers = TimerManager.get(hass)
 
-            output = timers.get_timers(device_or_entity_id=entity, name=timer_name)
+            output = (
+                timers.get_timers_as_dict(device_or_entity_id=entity, name=timer_name)
+                if timers
+                else []
+            )
+        else:
+            output = []
 
         connection.send_result(msg["id"], output)
 

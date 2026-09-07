@@ -12,12 +12,19 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, selector
 from homeassistant.helpers.dispatcher import async_dispatcher_send, callback
 
-from ..const import ATTR_DEVICE, DEVICES, DOMAIN, VAMode  # noqa: TID252
+from ..const import (
+    ATTR_DEVICE,
+    CONF_TIMERS,
+    DEVICES,
+    DOMAIN,
+    INTENT_TO_VIEW_MAPPING,
+    VAMode,
+)  # noqa: TID252
 from ..helpers import (  # noqa: TID252
     get_config_entry_by_entity_id,
     get_revert_settings_for_mode,
 )
-from ..typed import VAConfigEntry, VAEvent, VAEventType  # noqa: TID252
+from ..typed import DISPLAY_DEVICE_TYPES, VAConfigEntry, VAEvent, VAEventType  # noqa: TID252
 
 ATTR_PATH = "path"
 ATTR_REVERT_TIMEOUT = "revert_timeout"
@@ -87,6 +94,10 @@ class NavigationManager:
 
         Optionally revert to another view after timeout.
         """
+
+        # If not a display device then return.  Allows navigation to be called from other devices (e.g. mic) without error
+        if self.config.runtime_data.core.type not in DISPLAY_DEVICE_TYPES:
+            return
 
         # If new navigate before revert timer has expired, cancel revert timer.
         if not is_revert_action:
@@ -220,6 +231,20 @@ class NavigationManager:
             _LOGGER.debug("Stopping cycle display")
             self.cycle_view_task.cancel()
             self.cycle_view_task = None
+
+    def handle_intent_navigation(self, intent: str):
+        """Handle navigation intents."""
+        # Lookup intent in INTENT_TO_VIEW_MAPPING and get config item for view
+        # If found, navigate to that view
+        for view, intents in INTENT_TO_VIEW_MAPPING.items():
+            if intent in intents:
+                if path := getattr(self.config.runtime_data.dashboard, view):
+                    dashboard = self.config.runtime_data.dashboard.dashboard
+                    if dashboard and not path.startswith(dashboard):
+                        path = f"{dashboard}/{path}"
+                    if not path.startswith("/"):
+                        path = f"/{path}"
+                    self.browser_navigate(path=path)
 
 
 class NavigationManagerServices:

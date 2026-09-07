@@ -435,7 +435,9 @@ class SensorAttributeChangedHandler:
         elif new_mode == VAMode.CYCLE:
             # Start cycling views
             if self.navigation_manager:
-                cycle_views = self.config.runtime_data.dashboard.display_settings.cycle_views
+                cycle_views = (
+                    self.config.runtime_data.dashboard.display_settings.cycle_views
+                )
                 self.navigation_manager.start_display_view_cycle(cycle_views)
 
         elif new_mode == VAMode.HOLD:
@@ -465,8 +467,8 @@ class EntityStateChangedHandler:
         self.entity_id: str | None = None
 
         # Music mode auto-switching configuration
-        self.music_mode_auto = config.options.get(CONF_MUSIC_MODE_AUTO, False)
-        self.music_mode_timeout = config.options.get(CONF_MUSIC_MODE_TIMEOUT, 300)
+        self.music_mode_auto = config.runtime_data.default.music_mode_auto
+        self.music_mode_timeout = config.runtime_data.default.music_mode_timeout
         self.music_timeout_task: asyncio.Task | None = None
 
     def register_listeners(self) -> None:
@@ -726,16 +728,14 @@ class EntityStateChangedHandler:
 
     def _should_monitor_music_player(self) -> bool:
         """Check if music player monitoring should be enabled."""
-        musicplayer = self.config.runtime_data.core.musicplayer_device
-
-        if not musicplayer:
+        if not self.config.runtime_data.core.musicplayer_device:
             return False
 
         # Only monitor if at least one feature is enabled
-        if not self.music_mode_auto and self.music_mode_timeout <= 0:
-            return False
+        if self.music_mode_auto == "on" and self.music_mode_timeout > 0:
+            return True
 
-        return True
+        return False
 
     def _is_music_content(self, state_obj: State) -> bool:
         """Check if the media content type is an audio entertainment type."""
@@ -780,6 +780,7 @@ class EntityStateChangedHandler:
                 return
 
             self._handle_music_started()
+
         # Music stopped/paused
         elif new_state in (
             MediaPlayerState.IDLE,

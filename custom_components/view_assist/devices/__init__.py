@@ -35,11 +35,11 @@ DEVICE_MANAGER = "device_manager"
 
 ALL_DEVICE_MODULES = [
     EntityListeners,
+    NavigationManager,  # Added here to prevent error when navigation is called from non-display devices (e.g. mic) without error see issue #414 on View-Assist repo
 ]
 
 VIEW_DEVICE_MODULES = [
     MenuManager,
-    NavigationManager,
     BackgroundImageManager,
 ]
 
