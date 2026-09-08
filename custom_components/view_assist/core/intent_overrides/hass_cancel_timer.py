@@ -99,10 +99,16 @@ class VACancelTimerIntentHandler(intent.IntentHandler):
         if "time" in slots:
             slot_time = slots["time"]["value"]
             if TimerHelpers.is_datetime_string(slot_time):
-                timer_info = timer_manager.build_timer_info_from_datetime(slot_time)
+                timer_info = TimerHelpers.build_timer_info_from_datetime(
+                    slot_time,
+                    timezone=intent_obj.hass.config.time_zone,
+                    language=intent_obj.language,
+                )
             else:
                 timer_info = await timer_manager.build_timer_info_from_sentence(
-                    slot_time, language=intent_obj.language
+                    slot_time,
+                    timezone=intent_obj.hass.config.time_zone,
+                    language=intent_obj.language,
                 )
             if timer_info:
                 expiry = TimerHelpers.get_expiry_from_timerinfo(timer_info)
