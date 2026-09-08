@@ -381,7 +381,7 @@ class SentenceEncoder:
                 timer_info.days -= 1
 
         timer_info.is_interval = self._is_interval(timer_info, type_hint)
-        timer_info.tz = dt_util.now().tzinfo.key
+        timer_info.tz = self.hass.config.time_zone
 
         expiry_dt = TimerHelpers.get_expiry_from_timerinfo(timer_info)
         timer_info.expires_at = round(expiry_dt.timestamp())

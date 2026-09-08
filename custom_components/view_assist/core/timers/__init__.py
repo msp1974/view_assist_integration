@@ -176,6 +176,8 @@ class TimerManager:
     ) -> Timer | None:
         """Build a Timer object from a string, Duration, datetime or TimerInfo."""
 
+        timezone = self._hass.config.time_zone
+
         # Ensure either device_id or entity_id is provided and ensure device_id is set
         if not device_id and entity_id:
             device_id = get_device_id_from_entity_id(self._hass, entity_id)
@@ -194,12 +196,12 @@ class TimerManager:
         elif isinstance(timer_value, Duration):
             _LOGGER.debug("Building %s from Duration: %s", timer_class, timer_value)
             timer_info = TimerHelpers.build_timer_info_from_duration(
-                timer_value, language
+                timer_value, timezone=timezone, language=language
             )
         elif isinstance(timer_value, datetime):
             _LOGGER.debug("Building %s from datetime: %s", timer_class, timer_value)
             timer_info = TimerHelpers.build_timer_info_from_datetime(
-                timer_value, language
+                timer_value, timezone=timezone, language=language
             )
         elif isinstance(timer_value, TimerInfo):
             _LOGGER.debug("Building %s from TimerInfo: %s", timer_class, timer_value)
@@ -298,21 +300,28 @@ class TimerManager:
         return timer
 
     async def build_timer_info_from_sentence(
-        self, sentence: str, source: str | None = None, language: str | None = None
+        self,
+        sentence: str,
+        source: str | None = None,
+        timezone: str = "Europe/London",
+        language: str | None = None,
     ) -> TimerInfo | None:
         """Build a TimerInfo object from a sentence."""
 
         # Sentence could be a datetime
-
-        if language.split("-", 1)[0] != "en" and (
-            translator := Translator.get(self._hass)
+        if (
+            language
+            and language.split("-", 1)[0] != "en"
+            and (translator := Translator.get(self._hass))
         ):
             sentence = await translator.translate_time(sentence, locale=language)
             _LOGGER.debug("Translated time from %s to English: %s", language, sentence)
 
             # if using llm translation, result will be a datetime or duration, so we can use the existing functions to convert to TimerInfo
             if TimerHelpers.is_datetime_string(sentence):
-                return TimerHelpers.build_timer_info_from_datetime(sentence)
+                return TimerHelpers.build_timer_info_from_datetime(
+                    sentence, timezone=timezone, language=language
+                )
 
         # Encode to timer info
         encoder = SentenceEncoder(self._hass, self._config)

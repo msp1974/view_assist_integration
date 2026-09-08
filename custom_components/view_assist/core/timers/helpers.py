@@ -73,7 +73,7 @@ class TimerHelpers:
     def is_datetime_string(value: str) -> bool:
         """Check if a string is a datetime string."""
         try:
-            dt_util.parse_datetime(value, raise_on_error=True)
+            dt_util.parse_datetime(str(value), raise_on_error=True)
         except ValueError:
             return False
         return True
