@@ -20,7 +20,11 @@ from homeassistant.helpers.intent import (
 )
 from homeassistant.helpers.start import async_at_started
 
-from ..const import DOMAIN, ENABLE_INTENT_HOOKS, INSTALL_CUSTOM_SENTENCES  # noqa: TID252
+from ..const import (  # noqa: TID252
+    DOMAIN,
+    ENABLE_INTENT_HOOKS,
+    INSTALL_CUSTOM_SENTENCES,
+)
 from ..devices.navigation import NavigationManager  # noqa: TID252
 from ..helpers import (  # noqa: TID252
     get_config_entry_by_entity_id,
@@ -29,6 +33,7 @@ from ..helpers import (  # noqa: TID252
 )
 from ..typed import VAConfigEntry  # noqa: TID252
 from .intent_overrides import (
+    VABroadcastIntentHandler,
     VACancelAllTimersIntentHandler,
     VACancelTimerIntentHandler,
     VAMediaSearchAndPlayHandler,
@@ -36,7 +41,10 @@ from .intent_overrides import (
     VATimerStatusIntentHandler,
 )
 
-CUSTOM_SENTENCE_FILES = {"timers": ["view_assist_Timers.yaml"]}
+CUSTOM_SENTENCE_FILES = {
+    "timers": ["view_assist_Timers.yaml"],
+    "broadcast": ["view_assist_broadcast.yaml"],
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,6 +86,7 @@ class IntentsManager:
             self.register_override_handler(VATimerStatusIntentHandler())
             self.register_override_handler(VACancelTimerIntentHandler())
             self.register_override_handler(VACancelAllTimersIntentHandler())
+            self.register_override_handler(VABroadcastIntentHandler())
 
             # Hook into intent handlers after Home Assistant has started
             # and hopefully all integrations have registered their intents
