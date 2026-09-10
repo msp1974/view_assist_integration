@@ -287,4 +287,13 @@ INTENT_TO_VIEW_MAPPING = {
         INTENT_MEDIA_UNPAUSE,
     ],
     CONF_CLIMATE: [intent.INTENT_GET_TEMPERATURE],
+    "weather": ["HassGetWeather"],
+    "list": [
+        "HassShoppingListAddItem",
+        "HassShoppingListCompleteItem",
+        "HassListAddItem",
+        "HassListCompleteItem",
+        "HassListRemoveItem",
+    ],
+    "info": ["HassBroadcast"],
 }
