@@ -84,7 +84,8 @@ intents:
 
       - sentences:
           - "{timer_command:conversation_command} (in|after) <timer_duration>"
-          - "{timer_command:conversation_command} [on|at] [{timer_dayofweek:dayofweek} [at]] {timer_time:time}"
+          - "{timer_command:conversation_command} at {timer_time:time}"
+          - "{timer_command:conversation_command} [on] {timer_dayofweek:dayofweek} at {timer_time:time}"
           - "(in|after) <timer_duration> {timer_command:conversation_command}"
         slots:
           type: command
