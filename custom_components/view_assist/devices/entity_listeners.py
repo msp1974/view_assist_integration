@@ -666,14 +666,14 @@ class EntityStateChangedHandler:
                         navigation_manager.browser_navigate(
                             self.config.runtime_data.dashboard.intent
                         )
-                elif todos:
-                    _LOGGER.debug("Todo lists affected: %s", todos)
-                    updates["list"] = todos[0]  # Just use the first todo list
-                    self._update_sensor_entity(updates)
-                    if navigation_manager:
-                        navigation_manager.browser_navigate(
-                            self.config.runtime_data.dashboard.list_view
-                        )
+                # elif todos:
+                #     _LOGGER.debug("Todo lists affected: %s", todos)
+                #     updates["list"] = todos[0]  # Just use the first todo list
+                #     self._update_sensor_entity(updates)
+                #     if navigation_manager:
+                #         navigation_manager.browser_navigate(
+                #             self.config.runtime_data.dashboard.list_view
+                #         )
             # Checks if AI response or if no speech is returned
             elif not processed_locally and speech_text != "*":
                 _LOGGER.debug("No entities or todo lists affected")
