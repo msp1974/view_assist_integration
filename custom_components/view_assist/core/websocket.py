@@ -304,6 +304,7 @@ class WebsocketListenerHandler:
                     ],
                     "hide_header": data.dashboard.display_settings.screen_mode
                     in [VAScreenMode.HIDE_HEADER_SIDEBAR, VAScreenMode.HIDE_HEADER],
+                    "navigation_transition": data.dashboard.display_settings.navigation_transition,
                 }
             except Exception:  # noqa: BLE001
                 output = {}
