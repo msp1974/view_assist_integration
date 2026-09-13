@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation as cv, intent
 from homeassistant.util import dt as dt_util
 
-from ..timers import TimerClass, TimerManager, Duration, TimerHelpers  # noqa: TID252
+from ..timers import Duration, TimerClass, TimerHelpers, TimerManager  # noqa: TID252
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -141,7 +141,7 @@ class VAStartTimerIntentHandler(intent.IntentHandler):
                         response_slots["name"] = timer.name
                     response.async_set_speech_slots(response_slots)
                     return response
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 _LOGGER.error(
                     "Failed to set %s for %s: %s\n%s",
                     timer_class,
