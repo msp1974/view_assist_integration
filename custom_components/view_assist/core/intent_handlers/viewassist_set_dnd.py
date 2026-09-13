@@ -8,16 +8,13 @@ from homeassistant.helpers import intent
 
 from ...const import DOMAIN  # noqa: TID252
 
-from ...helpers import get_config_entry_by_entity_id
-from ...typed import VAConfigEntry
 
+class VASetDNDIntentHandler(intent.IntentHandler):
+    """Change View Asist do not disturb setting."""
 
-class VASetChangeViewIntentHandler(intent.IntentHandler):
-    """Change View Assist View."""
-
-    intent_type = "ViewAssistChangeView"
+    intent_type = "ViewAssistSetDND"
     description = """
-        Changes the displayed view on a View Assist satellite through voice command.
+        Changes setting for do not disturb on a View Assist satellite through voice command.
     """
 
     @property
@@ -25,42 +22,36 @@ class VASetChangeViewIntentHandler(intent.IntentHandler):
     def slot_schema(self) -> dict | None:
         """Return a slot schema."""
         return {
-            vol.Required("view"): str,
+            vol.Required("dnd_setting"): str,
         }
 
     @override
     async def async_handle(
         self, intent_obj: intent.Intent, extra_data: dict | None = None
     ) -> intent.IntentResponse:
-        """Change View Assist view."""
+        """Change View Assist do not disturb setting."""
         hass = intent_obj.hass
-        view = intent_obj.slots["view"]["value"]
-        
+        dnd_setting = intent_obj.slots["dnd_setting"]["value"]
         entity_id = (
             extra_data["entity_id"]
             if extra_data and "entity_id" in extra_data
             else None
         )
 
-        # Retrieve the dashboard path now that hass and entity_id are available
-        entry: VAConfigEntry = get_config_entry_by_entity_id(hass, entity_id)
-        dashboard_path = entry.runtime_data.dashboard.dashboard
-
+        # Call mode change here
         await hass.services.async_call(
             DOMAIN,
-            "navigate",
-            {
-                "device": entity_id,
-                "path": f"{dashboard_path}/{view}"
-            },
+            "set_state",
+            {"do_not_disturb": dnd_setting},
             blocking=True,
             context=intent_obj.context,
+            target={"entity_id": entity_id},
         )
 
         response = intent_obj.create_response()
         response.async_set_speech_slots(
             {
-                "view": view,
+                "dnd_setting": intent_obj.slots["dnd_setting"]["value"],
             }
         )
         return response

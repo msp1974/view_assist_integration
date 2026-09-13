@@ -1,0 +1,30 @@
+language: "en"
+lists:
+  dnd_setting:
+    values:
+      - in: "on"
+        out: "on"
+      - in: "enable"
+        out: "on"
+      - in: "enabled"
+        out: "on"        
+      - in: "off"
+        out: "off"
+      - in: "disable"
+        out: "off"
+      - in: "disabled"
+        out: "off"        
+intents:
+  ViewAssistSetDND:
+    data:
+      - sentences:
+          - "(set|change|switch) do not disturb [mode] [to] {dnd_setting}"
+          - "{dnd_setting} do not disturb [mode]"
+
+responses:
+  intents:
+    ViewAssistSetDND:
+      default: >
+        {% set dnd_setting = slots.dnd_setting if slots.dnd_setting is defined else none %}
+
+        "Do not disturb set to {{dnd_setting}}."
