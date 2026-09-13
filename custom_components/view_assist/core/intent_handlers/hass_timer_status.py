@@ -14,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class VATimerStatusIntentHandler(intent.IntentHandler):
-    """Intent handler for Set Alarm intents."""
+    """Intent handler for Timer Status intents."""
 
     intent_type = intent.INTENT_TIMER_STATUS
     description = f"""
