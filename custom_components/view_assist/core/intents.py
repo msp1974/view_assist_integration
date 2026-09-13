@@ -194,6 +194,7 @@ class IntentsManager:
                 else:
                     _LOGGER.debug("Removing intent handler for: %s", intent_type)
                     async_remove(self.hass, intent_type)
+                    async_register(self.hass, handler.handler)
 
     def get_supported_language_id(self, path: Path, language: str) -> str:
         """Get the supported language id for a given language."""
