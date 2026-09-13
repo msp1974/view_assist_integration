@@ -10,7 +10,7 @@ from pathlib import Path
 import pkgutil
 from typing import Any
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import dispatcher
 from homeassistant.helpers.intent import (
     DATA_KEY as INTENT_DATA_KEY,
@@ -33,11 +33,6 @@ from ..helpers import (  # noqa: TID252
 )
 from ..typed import VAConfigEntry  # noqa: TID252
 from . import intent_handlers
-
-CUSTOM_SENTENCE_FILES = {
-    "timers": ["view_assist_Timers.yaml"],
-    "broadcast": ["view_assist_broadcast.yaml"],
-}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -227,34 +222,32 @@ class IntentsManager:
         if not custom_sentences_dir.exists():
             custom_sentences_dir.mkdir(parents=True, exist_ok=True)
 
-        # Register sentences based on config of enhancmenet types
-        # TODO: Add config items
+        # Register every sentence file found for the supported language
         va_custom_sentences_dir = Path(va_custom_sentence_path, language)
-        for files in CUSTOM_SENTENCE_FILES.values():
-            for file in files:
-                src = Path(va_custom_sentences_dir) / file
-                dest = custom_sentences_dir / file
-                if not dest.exists():
-                    dest.symlink_to(src)
+        for src in va_custom_sentences_dir.glob("*.yaml"):
+            dest = custom_sentences_dir / src.name
+            if not dest.exists():
+                dest.symlink_to(src)
 
     async def unregister_custom_sentences(self) -> None:
         """Unregister custom sentences for intents."""
-        # Add symlinks for custom sentences to the HA custom sentences directory
-
-        custom_sentences_path = Path(self.hass.config.path("custom_sentences"))
-        language = self.get_supported_language_id(
-            custom_sentences_path, self.hass.config.language
+        va_custom_sentence_path = self.hass.config.path(
+            f"custom_components/{DOMAIN}/core/custom_sentences"
         )
-        custom_sentences_dir = Path(custom_sentences_path, language)
+        language = self.get_supported_language_id(
+            va_custom_sentence_path, self.hass.config.language
+        )
+
+        custom_sentences_dir = Path(self.hass.config.path("custom_sentences", language))
         if not custom_sentences_dir.exists():
             return
 
-        # Unregister sentences based on config of enhancmenet types
-        for files in CUSTOM_SENTENCE_FILES.values():
-            for file in files:
-                dest = custom_sentences_dir / file
-                if dest.exists() and dest.is_symlink():
-                    dest.unlink()
+        # Remove the symlinks for every sentence file found for the supported language
+        va_custom_sentences_dir = Path(va_custom_sentence_path, language)
+        for src in va_custom_sentences_dir.glob("*.yaml"):
+            dest = custom_sentences_dir / src.name
+            if dest.exists() and dest.is_symlink():
+                dest.unlink()
 
 
 class IntentHookHandler(IntentHandler):
