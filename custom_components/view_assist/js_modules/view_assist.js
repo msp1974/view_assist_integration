@@ -443,9 +443,7 @@ class ViewAssist {
         "home-assistant $ home-assistant-main"
       )
 
-      enabled ? elMain?.style?.setProperty("--mdc-drawer-width", "0px") : elMain?.style?.removeProperty("--mdc-drawer-width");
-      //Fix for HA 2026.6 where they changed the sidebar width variable name
-      enabled ? elMain?.style?.setProperty("--ha-sidebar-width", "0px") : elMain?.style?.removeProperty("--ha-sidebar -width");
+      enabled ? elMain?.style?.setProperty("--ha-sidebar-width", "0px") : elMain?.style?.removeProperty("--ha-sidebar-width");
 
       await selectTree(
         elMain, "$ partial-panel-resolver"
@@ -476,7 +474,7 @@ class ViewAssist {
       });
     } catch (e) {
       clearTimeout(this.hide_sidebar_timeout);
-      this.hide_sidebar_timerout = setTimeout(() => {
+      this.hide_sidebar_timeout = setTimeout(() => {
         this.hide_sidebar(enabled);
       }, 200);
     }
@@ -736,6 +734,7 @@ class ViewAssist {
     if (!payload.mimic_device) {
       // On register, go to default page
       if (reload) {
+        this.hide_sections();
         this.browser_navigate(payload.home);
       }
     }
