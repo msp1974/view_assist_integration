@@ -4,12 +4,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import importlib
 import inspect
+from inspect import signature
 import logging
 from pathlib import Path
 import pkgutil
 from typing import Any
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import dispatcher
 from homeassistant.helpers.intent import (
     DATA_KEY as INTENT_DATA_KEY,
@@ -33,11 +34,6 @@ from ..helpers import (  # noqa: TID252
 from ..typed import VAConfigEntry  # noqa: TID252
 from . import intent_handlers
 
-CUSTOM_SENTENCE_FILES = {
-    "timers": ["view_assist_Timers.yaml"],
-    "broadcast": ["view_assist_broadcast.yaml"],
-}
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -50,9 +46,9 @@ class IntentHandlerInfo:
     call_original: bool = False
 
 
-def discover_intent_handler_classes() -> list[type[IntentHandler]]:
+def discover_intent_handler_classes() -> dict[str, type[IntentHandler]]:
     """Discover IntentHandler subclasses defined in the intent_overrides package."""
-    handler_classes: list[type[IntentHandler]] = []
+    handler_classes: dict[str, type[IntentHandler]] = {}
     for module_info in pkgutil.iter_modules(
         intent_handlers.__path__, f"{intent_handlers.__name__}."
     ):
@@ -63,8 +59,42 @@ def discover_intent_handler_classes() -> list[type[IntentHandler]]:
                 and obj is not IntentHandler
                 and obj.__module__ == module.__name__
             ):
-                handler_classes.append(obj)
+                handler_classes[obj().intent_type] = obj
     return handler_classes
+
+
+def intent_to_dict(intent_obj: Intent) -> dict[str, Any]:
+    """Convert the intent object to a dictionary."""
+    return {
+        "platform": intent_obj.platform,
+        "intent_type": intent_obj.intent_type,
+        "slots": intent_obj.slots,
+        "text_input": intent_obj.text_input,
+        "context": intent_obj.context.as_dict(),
+        "language": intent_obj.language,
+        "assistant": intent_obj.assistant,
+        "device_id": intent_obj.device_id,
+        "satellite_id": intent_obj.satellite_id,
+        "conversation_agent_id": intent_obj.conversation_agent_id,
+    }
+
+
+def intent_response_to_dict(response: IntentResponse) -> dict[str, Any]:
+    """Convert the intent response object to a dictionary."""
+    return {
+        "language": response.language,
+        "intent": response.intent,
+        "speech": response.speech,
+        "reprompt": response.reprompt,
+        "card": response.card,
+        "error_code": response.error_code,
+        "success_results": response.success_results,
+        "failed_results": response.failed_results,
+        "matched_states": response.matched_states,
+        "unmatched_states": response.unmatched_states,
+        "speech_slots": response.speech_slots,
+        "response_type": response.response_type,
+    }
 
 
 class IntentsManager:
@@ -91,7 +121,7 @@ class IntentsManager:
             # Discover and register intent handlers, then hook into all
             # registered intents, after Home Assistant has started and
             # hopefully all integrations have registered their intents
-            async_at_started(self.hass, self.async_register_discovered_intent_handlers)
+            async_at_started(self.hass, self.async_register_intent_hooks_and_handlers)
 
         # Enable custom sentences for intents
         if INSTALL_CUSTOM_SENTENCES:
@@ -106,109 +136,65 @@ class IntentsManager:
 
     async def async_unload(self) -> bool:
         """Unload the Intents Manager."""
-        self.unregister_intent_hooks()
+        self.unregister_intent_hooks_and_handlers()
         await self.unregister_custom_sentences()
 
         return True
 
-    async def async_register_discovered_intent_handlers(
-        self, hass: HomeAssistant
-    ) -> None:
-        """Import intent_overrides handlers and register each as an override or new intent."""
-        existing_intents = hass.data.get(INTENT_DATA_KEY, {})
-        classes = self.hass.async_add_executor_job(discover_intent_handler_classes)
-        for handler_cls in await classes:
-            handler = handler_cls()
-            if handler.intent_type in existing_intents:
-                _LOGGER.debug(
-                    "Registering override for intent: %s", handler.intent_type
+    async def async_register_intent_hooks_and_handlers(self, *args) -> None:
+        """Register intent hooks, overriding or adding new from intent_handlers."""
+        existing_intents = self.hass.data.get(INTENT_DATA_KEY, {}).copy()
+        custom_handlers = await self.hass.async_add_executor_job(
+            discover_intent_handler_classes
+        )
+
+        # Register hooks with overrides
+        for intent_type, handler in existing_intents.items():
+            if intent_type in custom_handlers:
+                new_handler = IntentHookHandler(
+                    handler=custom_handlers[intent_type](),
+                    original_handler=handler,
                 )
-                self.register_intent_handler(handler)
             else:
-                _LOGGER.debug("Registering new intent handler: %s", handler.intent_type)
-                async_register(hass, handler)
+                new_handler = IntentHookHandler(
+                    handler=handler,
+                )
+            async_remove(self.hass, intent_type)
+            async_register(
+                self.hass,
+                new_handler,
+            )
+            _LOGGER.debug("Registered intent hook: %s -> %s", intent_type, handler)
 
-        self.register_intent_hooks(hass)
-
-    @callback
-    def register_intent_hooks(self, hass: HomeAssistant) -> None:
-        """Get registered intents."""
-        all_intents = hass.data.get(INTENT_DATA_KEY, {}).copy()
-        for intent_type, handler in all_intents.items():
-            if not isinstance(handler, IntentHookHandler):
-                if intent_type in self.overrides:
-                    override = self.overrides[intent_type]
-                    handler = override.handler
-
-                _LOGGER.debug("Registered intent: %s -> %s", intent_type, handler)
-                async_remove(hass, intent_type)
+        # Register new intents that are not already in existing_intents
+        for intent_type, handler_cls in custom_handlers.items():
+            if intent_type not in existing_intents:
+                new_handler = IntentHookHandler(
+                    handler=handler_cls(),
+                )
                 async_register(
-                    hass,
-                    IntentHookHandler(
-                        real_handler=handler,
-                    ),
+                    self.hass,
+                    new_handler,
+                )
+                _LOGGER.debug(
+                    "Registered new intent: %s -> %s", intent_type, new_handler
                 )
 
-    def unregister_intent_hooks(self):
+    def unregister_intent_hooks_and_handlers(self):
         """Unregister intent hooks and restore original handlers."""
         all_intents = self.hass.data.get(INTENT_DATA_KEY, {}).copy()
         for intent_type, handler in all_intents.items():
-            if isinstance(handler, IntentHookHandler) and handler.real_handler:
-                _LOGGER.debug("Restoring original intent handler for: %s", intent_type)
-                async_remove(self.hass, intent_type)
-                async_register(self.hass, handler.real_handler)
-
-    def register_intent_handler(
-        self, handler: IntentHandler, call_original: bool = False
-    ) -> Callable:
-        """Register a trigger."""
-        self.overrides[handler.intent_type] = IntentHandlerInfo(
-            intent=handler.intent_type,
-            handler=handler,
-            call_original=call_original,
-        )
-
-        @callback
-        def unregister_override() -> None:
-            """Unregister the trigger."""
-            self.overrides.pop(handler.intent_type, None)
-
-        return unregister_override
-
-    async def async_process_triggers(
-        self, intent_obj: Intent
-    ) -> tuple[IntentResponse | None, bool]:
-        """Process handlers for a given intent."""
-        result = None
-
-        for intent, override in self.overrides.items():
-            if intent_obj.intent_type == intent:
-                device_info = DeviceInfoData(
-                    self.hass, intent_obj.device_id
-                ).device_info
-                _LOGGER.debug(
-                    "Processing override for intent: %s with handler: %s and device info: %s",
-                    intent_obj.intent_type,
-                    override.handler,
-                    device_info,
-                )
-                response = await override.handler.async_handle(
-                    intent_obj,
-                    device_info,
-                )
-                _LOGGER.debug("Override result: %s", response)
-                if response:
-                    return response, override.call_original
-        return result, True
-
-    async def get_trigger_extra_data(self, intent_obj: Intent) -> dict[str, Any]:
-        """Get extra data for the intent."""
-        display = (
-            get_entity_id_from_conversation_device_id(self.hass, intent_obj.device_id)
-            if intent_obj.device_id
-            else None
-        )
-        return {"display": display}
+            if isinstance(handler, IntentHookHandler):
+                if handler.original_handler:
+                    _LOGGER.debug(
+                        "Restoring original intent handler for: %s", intent_type
+                    )
+                    async_remove(self.hass, intent_type)
+                    async_register(self.hass, handler.original_handler)
+                else:
+                    _LOGGER.debug("Removing intent handler for: %s", intent_type)
+                    async_remove(self.hass, intent_type)
+                    async_register(self.hass, handler.handler)
 
     def get_supported_language_id(self, path: Path, language: str) -> str:
         """Get the supported language id for a given language."""
@@ -237,34 +223,32 @@ class IntentsManager:
         if not custom_sentences_dir.exists():
             custom_sentences_dir.mkdir(parents=True, exist_ok=True)
 
-        # Register sentences based on config of enhancmenet types
-        # TODO: Add config items
+        # Register every sentence file found for the supported language
         va_custom_sentences_dir = Path(va_custom_sentence_path, language)
-        for files in CUSTOM_SENTENCE_FILES.values():
-            for file in files:
-                src = Path(va_custom_sentences_dir) / file
-                dest = custom_sentences_dir / file
-                if not dest.exists():
-                    dest.symlink_to(src)
+        for src in va_custom_sentences_dir.glob("*.yaml"):
+            dest = custom_sentences_dir / src.name
+            if not dest.exists():
+                dest.symlink_to(src)
 
     async def unregister_custom_sentences(self) -> None:
         """Unregister custom sentences for intents."""
-        # Add symlinks for custom sentences to the HA custom sentences directory
-
-        custom_sentences_path = Path(self.hass.config.path("custom_sentences"))
-        language = self.get_supported_language_id(
-            custom_sentences_path, self.hass.config.language
+        va_custom_sentence_path = self.hass.config.path(
+            f"custom_components/{DOMAIN}/core/custom_sentences"
         )
-        custom_sentences_dir = Path(custom_sentences_path, language)
+        language = self.get_supported_language_id(
+            va_custom_sentence_path, self.hass.config.language
+        )
+
+        custom_sentences_dir = Path(self.hass.config.path("custom_sentences", language))
         if not custom_sentences_dir.exists():
             return
 
-        # Unregister sentences based on config of enhancmenet types
-        for files in CUSTOM_SENTENCE_FILES.values():
-            for file in files:
-                dest = custom_sentences_dir / file
-                if dest.exists() and dest.is_symlink():
-                    dest.unlink()
+        # Remove the symlinks for every sentence file found for the supported language
+        va_custom_sentences_dir = Path(va_custom_sentence_path, language)
+        for src in va_custom_sentences_dir.glob("*.yaml"):
+            dest = custom_sentences_dir / src.name
+            if dest.exists() and dest.is_symlink():
+                dest.unlink()
 
 
 class IntentHookHandler(IntentHandler):
@@ -272,70 +256,42 @@ class IntentHookHandler(IntentHandler):
 
     def __init__(
         self,
-        real_handler: IntentHandler,
+        handler: IntentHandler,
+        original_handler: IntentHandler | None = None,
+        call_original: bool = False,
     ) -> None:
         """Initialize the intent handler."""
-        self.intent_type = real_handler.intent_type
-        self.platforms = real_handler.platforms
+
+        self.handler = handler
+        self.original_handler = original_handler
+        self.call_original = call_original
+
+        self.intent_type = handler.intent_type
+        self.platforms = handler.platforms
         self.description = (
-            real_handler.description or f"Hooked handler for {real_handler.intent_type}"
+            handler.description or f"Hooked handler for {handler.intent_type}"
         )
-        self.real_handler = real_handler
-
-    def intent_to_dict(self, intent_obj: Intent) -> dict[str, Any]:
-        """Convert the intent object to a dictionary."""
-        return {
-            "platform": intent_obj.platform,
-            "intent_type": intent_obj.intent_type,
-            "slots": intent_obj.slots,
-            "text_input": intent_obj.text_input,
-            "context": intent_obj.context.as_dict(),
-            "language": intent_obj.language,
-            "assistant": intent_obj.assistant,
-            "device_id": intent_obj.device_id,
-            "satellite_id": intent_obj.satellite_id,
-            "conversation_agent_id": intent_obj.conversation_agent_id,
-        }
-
-    def intent_response_to_dict(self, response: IntentResponse) -> dict[str, Any]:
-        """Convert the intent response object to a dictionary."""
-        return {
-            "language": response.language,
-            "intent": response.intent,
-            "speech": response.speech,
-            "reprompt": response.reprompt,
-            "card": response.card,
-            "error_code": response.error_code,
-            "success_results": response.success_results,
-            "failed_results": response.failed_results,
-            "matched_states": response.matched_states,
-            "unmatched_states": response.unmatched_states,
-            "speech_slots": response.speech_slots,
-            "response_type": response.response_type,
-        }
 
     async def async_handle(self, intent_obj: Intent) -> IntentResponse:
         """Handle the intent with custom logic."""
         _LOGGER.debug(
             "%s invoked with intent: %s",
             self.__class__.__name__,
-            self.intent_to_dict(intent_obj),
+            intent_to_dict(intent_obj),
         )
 
-        # Custom handling logic can be added here
-        if im := IntentsManager.get(intent_obj.hass):
-            response, call_original = await im.async_process_triggers(intent_obj)
+        response = await self.call_handler(self.handler, intent_obj)
 
-        # Call original handler
-        if not response or call_original:
-            response = await self.real_handler.async_handle(intent_obj)
+        if self.call_original and self.original_handler:
+            response = await self.call_handler(self.original_handler, intent_obj)
 
         _LOGGER.debug(
             "%s response: %s",
             self.__class__.__name__,
-            self.intent_response_to_dict(response),
+            intent_response_to_dict(response),
         )
 
+        # Notify device of intent handling
         dispatcher.async_dispatcher_send(
             intent_obj.hass,
             f"{intent_obj.device_id}-intent_handled",
@@ -345,14 +301,27 @@ class IntentHookHandler(IntentHandler):
 
         return response
 
+    async def call_handler(
+        self, handler: IntentHandler, intent_obj: Intent
+    ) -> IntentResponse:
+        """Call the given intent handler with the provided intent object."""
+        # check if handler has an extra_data parameter in async_handle
+        sig = signature(handler.async_handle)
+        if "extra_data" in sig.parameters:
+            return await handler.async_handle(
+                intent_obj=intent_obj,
+                extra_data=DeviceInfoData(intent_obj).device_info,
+            )
+        return await handler.async_handle(intent_obj=intent_obj)
+
 
 class DeviceInfoData:
     """Class to hold device information."""
 
-    def __init__(self, hass: HomeAssistant, conversation_device_id: str) -> None:
+    def __init__(self, intent_obj: Intent) -> None:
         """Initialize the DeviceInfo class."""
-        self.hass = hass
-        self.conversation_device_id = conversation_device_id
+        self.hass = intent_obj.hass
+        self.conversation_device_id = intent_obj.device_id
 
     @property
     def entity_id(self) -> str | None:

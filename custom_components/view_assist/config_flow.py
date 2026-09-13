@@ -61,6 +61,7 @@ from .const import (
     CONF_MUSIC_MODE_AUTO,
     CONF_MUSIC_MODE_TIMEOUT,
     CONF_MUSICPLAYER_DEVICE,
+    CONF_NAVIGATION_TRANSITION,
     CONF_ORIENTATION_SENSOR,
     CONF_ROTATE_BACKGROUND_INTERVAL,
     CONF_ROTATE_BACKGROUND_LINKED_ENTITY,
@@ -296,6 +297,7 @@ async def get_dashboard_options_schema(
                 custom_value=True,
             )
         ),
+        vol.Optional(CONF_NAVIGATION_TRANSITION): BooleanSelector(),
     }
 
     BACKGROUND_SETTINGS.update(background_extra)
