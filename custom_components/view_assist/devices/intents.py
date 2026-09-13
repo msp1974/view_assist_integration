@@ -132,12 +132,31 @@ class DeviceIntentsHandler:
                     conversation_id, []
                 )
 
-                if chatlog and chatlog.content:
-                    # Check for a tool result
-                    for entry in chatlog.content:
-                        if isinstance(entry, ToolResultContent):
-                            hass_tool_call = entry.tool_name
-                            break
+                # Find the last user role entry created datetime
+                last_user_entry_created_datetime = None
+                for entry in reversed(chatlog.content):
+                    if entry.role == "user":
+                        last_user_entry_created_datetime = entry.created
+                        break
+                _LOGGER.debug(
+                    "Last user entry created datetime for conversation_id '%s': %s",
+                    conversation_id,
+                    last_user_entry_created_datetime,
+                )
+
+                # Find if a tool result exists after the last user entry
+                tool_result_after_last_user_entry = None
+                for entry in chatlog.content:
+                    if (
+                        isinstance(entry, ToolResultContent)
+                        and last_user_entry_created_datetime
+                        and entry.created > last_user_entry_created_datetime
+                    ):
+                        tool_result_after_last_user_entry = entry
+                        break
+
+                if tool_result_after_last_user_entry:
+                    hass_tool_call = tool_result_after_last_user_entry.tool_name
 
         if hass_tool_call:
             self.navigate_for_intent(hass_tool_call)
@@ -166,6 +185,8 @@ class DeviceIntentsHandler:
             for view, intents in INTENT_TO_VIEW_MAPPING.items()
             if intent_type in intents
         ]
+
+        _LOGGER.warning("View matches for intent '%s': %s", intent_type, view_matches)
         if not view_matches:
             _LOGGER.debug("No view mapping found for intent: %s", intent_type)
             return
