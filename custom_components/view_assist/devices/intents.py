@@ -186,7 +186,6 @@ class DeviceIntentsHandler:
             if intent_type in intents
         ]
 
-        _LOGGER.warning("View matches for intent '%s': %s", intent_type, view_matches)
         if not view_matches:
             _LOGGER.debug("No view mapping found for intent: %s", intent_type)
             return
