@@ -1,0 +1,23 @@
+language: "en"
+lists:
+  mode:
+    values:
+      - in: music
+        out: music
+      - in: normal
+        out: normal
+      - in: cycle
+        out: cycle
+intents:
+  ViewAssistSetMode:
+    data:
+      - sentences:
+          - "set mode to {mode}"
+          - "turn on {mode} mode"
+          - "set [to] {mode} mode"
+responses:
+  intents:
+    ViewAssistSetMode:
+      default: >
+        {% set mode = slots.mode if slots.mode is defined else none %}
+        "Setting mode to {{mode}}"
