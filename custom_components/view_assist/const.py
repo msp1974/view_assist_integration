@@ -292,7 +292,6 @@ INTENT_TO_VIEW_MAPPING = {
         intent.INTENT_GET_TEMPERATURE,
         "HassClimateSetTemperature",
     ],
-
     CONF_WEATHER: ["HassGetWeather"],
     "list": [
         "todo__get_items",
@@ -302,5 +301,6 @@ INTENT_TO_VIEW_MAPPING = {
         "HassListCompleteItem",
         "HassListRemoveItem",
     ],
+    "calendar": ["ViewAssistShowCalendar"],
     "info": ["info", "HassBroadcast"],
 }
