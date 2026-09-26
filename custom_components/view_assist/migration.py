@@ -46,7 +46,7 @@ async def async_migrate_view_assist_config_entry(
         "Config Migration from v%s.%s - %s",
         entry.version,
         entry.minor_version,
-        entry.options,
+        entry.title,
     )
     new_options = {**entry.options}
     if entry.minor_version < 2 and entry.options:
@@ -139,7 +139,7 @@ async def async_migrate_view_assist_config_entry(
                 "on" if new_options.get(CONF_MUSIC_MODE_AUTO) else "off"
             )
 
-    if new_options != entry.options:
+    if entry.minor_version < 6:
         hass.config_entries.async_update_entry(
             entry, options=new_options, minor_version=6, version=1
         )

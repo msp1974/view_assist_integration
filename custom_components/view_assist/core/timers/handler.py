@@ -14,20 +14,17 @@ from homeassistant.components.intent import (
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import Context, Event, HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util import dt as dt_util
 
-from ...const import (  # noqa: TID252
-    DEFAULT_ALARM_SOUND_FILE,
-    EVENT_ALARM_SOUND,
-    EVENT_ALARM_STOP,
-    VACA_DOMAIN,
-)
+from ...const import DEFAULT_ALARM_SOUND_FILE, DOMAIN, VACA_DOMAIN  # noqa: TID252
 from ...helpers import (  # noqa: TID252
+    get_config_entry_by_entity_id,
     get_mic_device_domain,
     get_mic_device_id_from_entity_id,
     normalize_name,
 )
-from ...typed import VAConfigEntry, VATimeFormat  # noqa: TID252
+from ...typed import VAConfigEntry, VAEvent, VAEventType, VATimeFormat  # noqa: TID252
 from .helpers import TimerHelpers
 from .storage import VATimerStore
 from .typed import (
@@ -176,7 +173,7 @@ class TimerHandler:
 
                 # Fire event - done here to only fire if new timer started not
                 # existing timer restarted after HA restart
-                await self._fire_event(timer.id, TimerEvent.STARTED)
+                await self._fire_event(timer, TimerEvent.STARTED)
 
     async def snooze_timer(
         self, timer_id: str, minutes: int
@@ -201,7 +198,7 @@ class TimerHandler:
 
             await self.store.update_status(timer_id, TimerStatus.SNOOZED)
             await self.start_timer(timer)
-            await self._fire_event(timer_id, TimerEvent.SNOOZED)
+            await self._fire_event(timer, TimerEvent.SNOOZED)
 
             return (
                 "timer_named_snoozed" if timer.name else "timer_snoozed",
@@ -268,8 +265,8 @@ class TimerHandler:
                     for task in (wait_task, sounding_task):
                         if task and not task.done():
                             task.cancel()
-                    if (wait_task or sounding_task) and fire_event:
-                        await self._fire_event(timerid, TimerEvent.CANCELLED)
+                    if fire_event:
+                        await self._fire_event(timer, TimerEvent.CANCELLED)
             return True
         return False
 
@@ -417,18 +414,33 @@ class TimerHandler:
 
         return filter_list
 
-    async def _fire_event(self, timer_id: int, event_type: TimerEvent):
+    async def _fire_event(self, timer: Timer, event_type: TimerEvent):
         """Fire timer event on the event bus."""
-        if timer := self.store.timers.get(timer_id):
-            event_name = (
-                VA_COMMAND_EVENT_PREFIX
-                if timer.timer_class == TimerClass.COMMAND
-                else VA_EVENT_PREFIX
-            ).format(event_type)
-            event_data = {"timer_id": timer_id}
-            event_data.update(timer.to_dict())
-            self.hass.bus.async_fire(event_name, event_data)
-            _LOGGER.debug("Timer event fired: %s - %s", event_name, event_data)
+        event_name = (
+            VA_COMMAND_EVENT_PREFIX
+            if timer.timer_class == TimerClass.COMMAND
+            else VA_EVENT_PREFIX
+        ).format(event_type)
+        event_data = {"timer_id": timer.id}
+        event_data.update(timer.to_dict())
+        self.hass.bus.async_fire(event_name, event_data)
+        entry = get_config_entry_by_entity_id(self.hass, timer.entity_id)
+        async_dispatcher_send(
+            self.hass,
+            f"{DOMAIN}_{entry.entry_id}_event",
+            VAEvent(
+                VAEventType.TIMER_UPDATE,
+                {
+                    "event": event_type,
+                    "event_timer": timer,
+                    "timers": [
+                        timer.to_dict()
+                        for timer in self.get_timers(entity_id=timer.entity_id)
+                    ],
+                },
+            ),
+        )
+        _LOGGER.debug("Timer event fired: %s - %s", event_name, event_data)
 
     def is_duplicate_timer(self, timer: Timer) -> Timer | None:
         """Return if same timer already exists."""
@@ -463,10 +475,10 @@ class TimerHandler:
 
     async def _pre_expire_warning(self, timer_id: str) -> None:
         """Call event on timer pre_expire_warning and then call expire."""
-        timer = self.store.timers[timer_id]
+        timer = self.store.timers.get(timer_id)
 
         if timer and timer.status == TimerStatus.RUNNING:
-            await self._fire_event(timer_id, TimerEvent.WARNING)
+            await self._fire_event(timer, TimerEvent.WARNING)
 
             await asyncio.sleep(timer.timer_info.pre_expire_warning)
             await self._timer_finished(timer_id)
@@ -482,7 +494,7 @@ class TimerHandler:
         self.timer_tasks.pop(timer_id, None)
 
         # Every timer fires an expired event when it finishes, regardless of class
-        await self._fire_event(timer_id, TimerEvent.EXPIRED)
+        await self._fire_event(timer, TimerEvent.EXPIRED)
 
         if timer.timer_class == TimerClass.REMINDER:
             # Keep announcing the reminder on a repeating interval until it's
@@ -566,9 +578,16 @@ class TimerHandler:
             device_domain,
         )
 
+        entry = get_config_entry_by_entity_id(self.hass, timer.entity_id)
+
         if device_domain == VACA_DOMAIN:
             device_id = get_mic_device_id_from_entity_id(self.hass, timer.entity_id)
             self.hass.bus.async_fire("va_alarm_start", {ATTR_DEVICE_ID: device_id})
+            async_dispatcher_send(
+                self.hass,
+                f"{DOMAIN}_{entry.entry_id}_event",
+                VAEvent(VAEventType.ALARM_SOUNDING, {"state": True}),
+            )
             return
 
         from ..alarm_streamer import AlarmStreamer  # noqa: PLC0415, TID252
@@ -576,6 +595,11 @@ class TimerHandler:
         alarm_streamer = AlarmStreamer.get(self.hass)
         if alarm_streamer:
             await alarm_streamer.alarm_sound(timer.entity_id, DEFAULT_ALARM_SOUND_FILE)
+            async_dispatcher_send(
+                self.hass,
+                f"{DOMAIN}_{entry.entry_id}_event",
+                VAEvent(VAEventType.ALARM_SOUNDING, {"state": True}),
+            )
         else:
             _LOGGER.error(
                 "Alarm streamer not available to sound alarm for %s", timer.entity_id
@@ -587,10 +611,16 @@ class TimerHandler:
             return
 
         device_domain = get_mic_device_domain(self.hass, timer.entity_id)
+        entry = get_config_entry_by_entity_id(self.hass, timer.entity_id)
 
         if device_domain == VACA_DOMAIN:
             device_id = get_mic_device_id_from_entity_id(self.hass, timer.entity_id)
             self.hass.bus.async_fire("va_alarm_stop", {ATTR_DEVICE_ID: device_id})
+            async_dispatcher_send(
+                self.hass,
+                f"{DOMAIN}_{entry.entry_id}_event",
+                VAEvent(VAEventType.ALARM_SOUNDING, {"state": False}),
+            )
             return
 
         from ..alarm_streamer import AlarmStreamer  # noqa: PLC0415, TID252
@@ -598,6 +628,11 @@ class TimerHandler:
         alarm_streamer = AlarmStreamer.get(self.hass)
         if alarm_streamer:
             await alarm_streamer.cancel_alarm_sound(timer.entity_id)
+            async_dispatcher_send(
+                self.hass,
+                f"{DOMAIN}_{entry.entry_id}_event",
+                VAEvent(VAEventType.ALARM_SOUNDING, {"state": False}),
+            )
 
     async def _handle_alarm_stop_event(self, event: Event) -> None:
         """Cancel any sounding TIMER/ALARM timer whose device just stopped sounding."""

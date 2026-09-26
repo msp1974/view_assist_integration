@@ -10,7 +10,11 @@ from homeassistant.core import (
     State,
     callback,
 )
-from homeassistant.helpers import dispatcher, intent
+from homeassistant.helpers import intent
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.event import async_track_state_change_event
 
 from ..const import DEVICES, DOMAIN, INTENT_TO_VIEW_MAPPING  # noqa: TID252
@@ -20,13 +24,16 @@ from ..helpers import (  # noqa: TID252
     get_sensor_entity_from_instance,
 )
 from ..typed import VAConfigEntry, VAEvent, VAEventType  # noqa: TID252
+from .base import DeviceModule
 from .navigation import NavigationManager
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class DeviceIntentsHandler:
+class DeviceIntentsHandler(DeviceModule):
     """Class to handle intents for View Assist Devices."""
+
+    _dependencies = ["StatusManager"]
 
     @classmethod
     def get(
@@ -40,8 +47,7 @@ class DeviceIntentsHandler:
 
     def __init__(self, hass: HomeAssistant, config: VAConfigEntry) -> None:
         """Initialize device intents handler."""
-        self.hass = hass
-        self.config = config
+        super().__init__(hass, config)
 
         self.current_conversation_id: str | None = None
 
@@ -50,44 +56,24 @@ class DeviceIntentsHandler:
     def register_listener(self) -> None:
         """Register event listeners for intents."""
         device_id = get_device_id_from_entity_id(
-            self.hass, self.config.runtime_data.core.mic_device
+            self._hass, self._config.runtime_data.core.mic_device
         )
 
         # Add intent sensor listener for vaca
-        if intent_device := self.config.runtime_data.core.intent_device:
+        if intent_device := self._config.runtime_data.core.intent_device:
             # Add listener
-            self.config.async_on_unload(
+            self._config.async_on_unload(
                 async_track_state_change_event(
-                    self.hass, intent_device, self._async_on_intent_device_change
+                    self._hass, intent_device, self._async_on_intent_device_change
                 )
             )
 
         if device_id:
-            self.config.async_on_unload(
-                dispatcher.async_dispatcher_connect(
-                    self.hass, f"{device_id}-intent_handled", self.async_handle_intent
+            self._config.async_on_unload(
+                async_dispatcher_connect(
+                    self._hass, f"{device_id}-intent_handled", self.async_handle_intent
                 )
             )
-
-    async def async_handle_intent(
-        self, intent_obj: intent.Intent, response: intent.IntentResponse
-    ) -> None:
-        """Handle the intent dispatched for the device."""
-
-        intent_type = intent_obj.intent_type
-        sensor_entity = get_sensor_entity_from_instance(self.hass, self.config.entry_id)
-
-        # --------------------------------------------------------------------------------
-        # Extract relevant information from the intent and response
-        # Set any device values here based on the intent and response
-        # --------------------------------------------------------------------------------
-
-        _LOGGER.debug(
-            "Handling intent '%s' for sensor entity '%s'", intent_type, sensor_entity
-        )
-
-        # Do intent navigation based on the intent type
-        self.navigate_for_intent(intent_type)
 
     def _validate_event(self, event: Event[EventStateChangedData]) -> bool:
         """Validate event."""
@@ -104,6 +90,48 @@ class DeviceIntentsHandler:
             # If not change to state, ignore
             return False
         return True
+
+    async def async_handle_intent(
+        self, intent_obj: intent.Intent, response: intent.IntentResponse
+    ) -> None:
+        """Handle the intent dispatched for the device."""
+
+        intent_type = intent_obj.intent_type
+        speech_text = get_key("plain.speech", response.speech)
+        sensor_entity = get_sensor_entity_from_instance(
+            self._hass, self._config.entry_id
+        )
+
+        # --------------------------------------------------------------------------------
+        # Extract relevant information from the intent and response
+        # Set any device values here based on the intent and response
+        # --------------------------------------------------------------------------------
+
+        _LOGGER.debug(
+            "Handling intent '%s' for sensor entity '%s'", intent_type, sensor_entity
+        )
+
+        payload = {
+            "intent": intent_type,
+            "command": intent_obj.text_input,
+            "response": speech_text,
+            "processed_locally": True,
+            "changed_entities": [
+                target.id
+                for target in response.success_results
+                if target.type == "entity"
+            ],
+            "view_data": None,
+        }
+
+        async_dispatcher_send(
+            self._hass,
+            f"{DOMAIN}_{self._config.entry_id}_event",
+            VAEvent(VAEventType.INTENT_UPDATE, payload),
+        )
+
+        # Do intent navigation based on the intent type
+        self.navigate_for_intent(intent_type)
 
     @callback
     def _async_on_intent_device_change(
@@ -128,9 +156,9 @@ class DeviceIntentsHandler:
         if intent_output:
             if conversation_id := intent_output.get("conversation_id"):
                 # Get conversation from chat log
-                chatlog: ChatLog = self.hass.data.get("conversation_chat_logs", {}).get(
-                    conversation_id, []
-                )
+                chatlog: ChatLog = self._hass.data.get(
+                    "conversation_chat_logs", {}
+                ).get(conversation_id, [])
 
                 # Find the last user role entry created datetime
                 last_user_entry_created_datetime = None
@@ -164,17 +192,36 @@ class DeviceIntentsHandler:
 
         if intent_output:
             speech_text = get_key("response.speech.plain.speech", intent_output)
+            success_results = get_key("response.data.success", intent_output)
             if speech_text:
                 word_count = len(speech_text.split())
                 message_font_size = ["10vw", "8vw", "6vw", "4vw"][
                     min(word_count // 6, 3)
                 ]
-                updates = {
+                view_data = {
                     "title": "AI Response",
                     "message": speech_text,
                     "message_font_size": message_font_size,
                 }
-                self._update_sensor_entity(updates)
+
+                payload = {
+                    "intent": None,
+                    "command": None,
+                    "response": speech_text,
+                    "processed_locally": processed_locally,
+                    "changed_entities": [
+                        target.get("id")
+                        for target in success_results
+                        if target.get("type") == "entity"
+                    ],
+                    "view_data": view_data,
+                }
+
+                async_dispatcher_send(
+                    self._hass,
+                    f"{DOMAIN}_{self._config.entry_id}_event",
+                    VAEvent(VAEventType.INTENT_UPDATE, payload),
+                )
 
                 self.navigate_for_intent("info")
 
@@ -191,10 +238,10 @@ class DeviceIntentsHandler:
             return
 
         view = view_matches[0]
-        dashboard = self.config.runtime_data.dashboard.dashboard
+        dashboard = self._config.runtime_data.dashboard.dashboard
 
-        if hasattr(self.config.runtime_data.dashboard, view):
-            path = getattr(self.config.runtime_data.dashboard, view)
+        if hasattr(self._config.runtime_data.dashboard, view):
+            path = getattr(self._config.runtime_data.dashboard, view)
         else:
             # Navigation will fallback to using view as view name if config item not found
             path = view
@@ -204,14 +251,5 @@ class DeviceIntentsHandler:
         if not path.startswith("/"):
             path = f"/{path}"
 
-        nm = NavigationManager.get(self.hass, self.config)
+        nm = NavigationManager.get(self._hass, self._config)
         nm.browser_navigate(path=path)
-
-    def _update_sensor_entity(self, updates: dict) -> None:
-        """Update sensor entity attributes."""
-        self.config.runtime_data.extra_data.update(updates)
-        dispatcher.async_dispatcher_send(
-            self.hass,
-            f"{DOMAIN}_{self.config.entry_id}_event",
-            VAEvent(VAEventType.CONFIG_UPDATE),
-        )
