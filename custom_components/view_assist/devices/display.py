@@ -7,16 +7,15 @@ from datetime import timedelta
 from enum import StrEnum
 import logging
 
-from config.custom_components.view_assist.devices.navigation import NavigationManager
-from config.custom_components.view_assist.devices.status import StatusManager
 from homeassistant.components.assist_satellite.entity import AssistSatelliteState
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
 
 from ..const import DEVICES, DOMAIN, VAMode  # noqa: TID252
 from ..typed import VAConfigEntry  # noqa: TID252
 from .base import DeviceModule
+from .navigation import NavigationManager
+from .status import StatusManager
 
 
 class TimeOutMode(StrEnum):
