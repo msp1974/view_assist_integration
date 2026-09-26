@@ -1,6 +1,5 @@
 """VA Sensors."""
 
-import asyncio
 from collections.abc import Callable
 from dataclasses import asdict
 from datetime import datetime as dt
@@ -10,7 +9,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.config_validation import make_entity_service_schema
@@ -18,10 +17,8 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .core import TimerManager
-from .devices.menu import MenuManager
 from .devices.status import StatusManager
-from .helpers import get_device_id_from_entity_id
+from .helpers import get_device_id_from_entity_id, get_mute_switch_entity_id
 from .typed import (
     DISPLAY_DEVICE_TYPES,
     VAConfigEntry,
@@ -146,6 +143,9 @@ class ViewAssistSensor(SensorEntity):
             attrs["media_track"] = sm.media_track
             attrs["muted"] = sm.muted
             attrs["use_announce"] = sm.config.default.use_announce
+            attrs["mute_switch"] = (
+                get_mute_switch_entity_id(self.hass, sm.config.core.mic_device),
+            )
         return attrs
 
     def _get_display_device_status_attributes(self) -> dict[str, Any]:
