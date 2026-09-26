@@ -1,6 +1,6 @@
 import { timerCards } from "./timers.js?v=1.0.30";
 
-const version = "1.0.31"
+const version = "1.0.32-rc2"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 const INITIAL_LOAD_OVERLAY_ID = "view-assist-initial-load-overlay";
@@ -325,9 +325,6 @@ class VAData {
 }
 
 class ViewAssistHelpers {
-  constructor(hass) {
-    this.hass = hass;
-  }
 
   getTimer(timer_id) {
     if (!window.viewassist?.config?.timers) return null;
@@ -561,7 +558,7 @@ class ViewAssist {
 
       // Connect to server websocket
       this._hass = await hass();
-      this.variables.helpers = new ViewAssistHelpers(this._hass);
+      this.variables.helpers = new ViewAssistHelpers();
 
       // Add custom elements
       customElements.define("viewassist-countdown", CountdownTimer)
@@ -584,15 +581,60 @@ class ViewAssist {
         });
 
         window.addEventListener("location-changed", () => {
-          setTimeout(() => {
+          setTimeout(async () => {
             this.hide_sections(false);
             this.display_browser_id();
+            await this.send_current_path();
           }, 100);
         });
+        await this.send_current_path();
       }
+
+      this.register_activity_listener();
 
     } catch (e) {
       console.log("Error on initialisation: ", e.message);
+    }
+  }
+
+  async send_current_path() {
+    await this._hass.callWS({
+      type: 'view_assist/set_current_path',
+      browser_id: this.variables.browser_id,
+      path: window.location.pathname
+    });
+  }
+
+  register_activity_listener() {
+    // Capture all screen touches/clicks to register activity without
+    // interfering with delivery to the underlying screen element
+    const ACTIVITY_THROTTLE_MS = 1000;
+    let last_sent = 0;
+
+    const on_activity = () => {
+      const now = Date.now();
+      if (now - last_sent < ACTIVITY_THROTTLE_MS) return;
+      last_sent = now;
+      this.send_activity();
+    };
+
+    for (const event_name of ["pointerdown", "touchstart"]) {
+      window.addEventListener(event_name, on_activity, {
+        capture: true,
+        passive: true,
+      });
+    }
+  }
+
+  async send_activity() {
+    if (!this.connected) return;
+    try {
+      await this._hass.callWS({
+        type: 'view_assist/register_activity',
+        browser_id: this.variables.browser_id,
+      });
+    } catch (e) {
+      console.log("View Assist - Error registering activity: ", e.message);
     }
   }
 
@@ -689,7 +731,7 @@ class ViewAssist {
         await this.hide_sections(this.variables.registered);
         setTimeout(() => this.display_browser_id(), 2000);
         break;
-      case "config_update":
+      case "status_change":
         this.process_config(event, payload);
         break;
       case "timer_update":
@@ -703,7 +745,7 @@ class ViewAssist {
           this.browser_navigate(payload["path"]);
         }
         break;
-      case "listening":
+      case "assist_state_change":
         if (!is_mimic) {
           this.show_assist_listening_overlay(payload["state"], payload["style"])
         }
@@ -912,6 +954,11 @@ class ViewAssist {
           div.style.display = "none";
         }
       });
+
+      // Get style from config if not provided
+      if (!style) {
+        style = this.variables.config.config.dashboard.display_settings.assist_prompt
+      }
 
 
       const styleDiv = overlays.querySelector(`[id=${style}]`);
