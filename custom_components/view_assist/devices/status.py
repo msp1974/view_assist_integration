@@ -10,7 +10,7 @@ Setting the hold value when mode is set to hold instead of setting mode to hold 
 
 import contextlib
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from typing import Any
 
@@ -27,7 +27,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from ..const import DEVICES, DOMAIN, MUSIC_MEDIA_TYPES, VAMode  # noqa: TID252
-from ..core.timers import Timer, TimerManager, TimerEvent  # noqa: TID252
+from ..core.timers import Timer, TimerEvent, TimerManager  # noqa: TID252
 from ..helpers import (  # noqa: TID252
     get_device_id_from_entity_id,
     get_mimic_entity_id,
@@ -150,6 +150,7 @@ class StatusManager(DeviceModule, Status):
         self._rt = config.runtime_data
         self._notify_cancel: CALLBACK_TYPE | None = None
         self._event_listeners: dict[str, list[CALLBACK_TYPE]] = {}
+        self.force_activity_timeout_flag: bool = False
 
         # Device entry events
         self._config.async_on_unload(
@@ -163,7 +164,10 @@ class StatusManager(DeviceModule, Status):
     def __setattr__(self, name: str, value: Any) -> None:
         """Set an attribute, notifying on_change if the value changed."""
         cancel = False
-        if not name.startswith("_"):
+        if not name.startswith("_") and name not in [
+            "force_activity_timeout_flag",
+            "last_activity",
+        ]:
             if self._initialised and self._on_change:
                 # Only set to false if false.  If True or None then set True
                 if self._on_change(name, value) == False:  # noqa: E712
@@ -211,6 +215,17 @@ class StatusManager(DeviceModule, Status):
     def register_activity(self) -> None:
         """Register the last activity for the device."""
         self.last_activity = dt_util.now()
+
+    def force_activity_timeout(self, delay: int = 1) -> None:
+        """Force an activity timeout for the device."""
+
+        def _set_force_activity_timeout_flag() -> None:
+            self.force_activity_timeout_flag = True
+
+        if delay > 0:
+            self._hass.loop.call_later(delay, _set_force_activity_timeout_flag)
+        else:
+            self.force_activity_timeout_flag = True
 
     async def _async_load_from_store(self) -> None:
         """Load the status from the store."""
@@ -287,9 +302,6 @@ class StatusManager(DeviceModule, Status):
         if event_type == VAEventType.BROWSER_REGISTERED:
             browser_id = event.payload.get("browser_id", None)
             self.browser_connected = bool(browser_id)
-            self.is_mimic = (
-                get_mimic_entity_id(self._hass, browser_id) == self._entity_id
-            )
 
         # Handle browser unregistration events
         elif event_type == VAEventType.BROWSER_UNREGISTERED:
@@ -339,20 +351,27 @@ class StatusManager(DeviceModule, Status):
             state = payload.get("state", MediaPlayerState.IDLE)
             attrs = payload.get("attributes", {})
 
-            self.is_music_playing = state == MediaPlayerState.PLAYING
-            self.media_content_type = attrs.get("media_content_type")
-            self.media_artist = attrs.get("media_artist")
-            self.media_album = attrs.get("media_album_name")
-            self.media_track = attrs.get("media_title")
-            self.register_activity()
+            state_changed = self.is_music_playing != (state == MediaPlayerState.PLAYING)
 
-            if (
-                self.is_music_playing
-                and self.media_content_type in MUSIC_MEDIA_TYPES
-                and self.current_path != self._config.runtime_data.dashboard.music
-            ):
-                if nm := NavigationManager.get(self._hass, self._config):
-                    nm.browser_navigate(self._config.runtime_data.dashboard.music)
+            if state_changed:
+                self.is_music_playing = state == MediaPlayerState.PLAYING
+                self.media_content_type = attrs.get("media_content_type")
+                self.media_artist = attrs.get("media_artist")
+                self.media_album = attrs.get("media_album_name")
+                self.media_track = attrs.get("media_title")
+
+                if (
+                    self.is_music_playing
+                    and self.media_content_type in MUSIC_MEDIA_TYPES
+                    and self.current_path != self._config.runtime_data.dashboard.music
+                ):
+                    self.register_activity()
+                    if nm := NavigationManager.get(self._hass, self._config):
+                        nm.browser_navigate(self._config.runtime_data.dashboard.music)
+
+                # Force revert without waiting for the normal timeout
+                if not self.is_music_playing:
+                    self.force_activity_timeout()
 
         # Handle mic mute switch update
         elif event_type == VAEventType.MICROPHONE_STATE_CHANGE:
@@ -425,6 +444,10 @@ class StatusManager(DeviceModule, Status):
                     mm.add_items(VAMode.HOLD)
                 else:
                     mm.remove_items(VAMode.HOLD)
+
+        # Force activity timeout if hold is disabled
+        if not self.hold:
+            self.force_activity_timeout()
 
     def _on_set_current_path(self, path: str) -> None:
         """Set the current path for the device."""
