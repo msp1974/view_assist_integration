@@ -80,7 +80,6 @@ class Status:
     current_path: str | None = None
     hold: bool = False
     mode: VAMode = VAMode.NORMAL
-    is_mimic: bool = False
     is_music_playing: bool = False
     media_content_type: str | None = None
     media_artist: str | None = None
