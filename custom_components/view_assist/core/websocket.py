@@ -244,7 +244,7 @@ class WebsocketListenerHandler:
             )
 
     def _get_event_data(self) -> dict[str, Any]:
-        output = {}
+        output = {"is_mimic": self.mimic}
         config = self.config
 
         # Use mimic'd entity config if mimic device
@@ -256,7 +256,7 @@ class WebsocketListenerHandler:
                 return output
             try:
                 if sm := StatusManager.get(self.hass, config):
-                    output = sm.as_dict()
+                    output.update(sm.as_dict())
             except Exception:  # noqa: BLE001
                 output = {}
         return output
