@@ -20,21 +20,20 @@ from homeassistant.helpers.dispatcher import (
 )
 
 from ..const import DOMAIN  # noqa: TID252
-from ..devices.menu import MenuManager  # noqa: TID252
+from ..devices.status import StatusManager  # noqa: TID252
 from ..helpers import (  # noqa: TID252
     get_config_entry_by_entity_id,
-    get_device_id_from_entity_id,
     get_entity_id_by_browser_id,
     get_mimic_entity_id,
 )
-from ..typed import VAConfigEntry, VAEvent, VAEventType, VAScreenMode  # noqa: TID252
+from ..typed import VAConfigEntry, VAEvent, VAEventType  # noqa: TID252
 from .timers import TimerManager
 
 _LOGGER = logging.getLogger(__name__)
 
 BROWSER_IDS = "browser_ids"
 WEBSOCKET_MANAGER = "websocket_manager"
-WEBSOCKET_EVENTS = [VAEventType.ASSIST_LISTENING, VAEventType.NAVIGATION]
+WEBSOCKET_EVENTS = [VAEventType.ASSIST_STATE_CHANGE, VAEventType.NAVIGATION]
 
 
 class WebsocketManager:
@@ -99,6 +98,12 @@ class WebsocketManager:
         if browser_id in self.hass.data[DOMAIN][BROWSER_IDS]:
             del self.hass.data[DOMAIN][BROWSER_IDS][browser_id]
 
+        async_dispatcher_send(
+            self.hass,
+            f"{DOMAIN}_{self.config.entry_id}_event",
+            VAEvent(VAEventType.BROWSER_REGISTERED, {"browser_id": None}),
+        )
+
 
 class WebsocketListenerHandler:
     """Class to handle websocket listeners."""
@@ -140,7 +145,9 @@ class WebsocketListenerHandler:
             async_dispatcher_send(
                 self.hass,
                 f"{DOMAIN}_{self.config.entry_id}_event",
-                VAEvent(VAEventType.BROWSER_REGISTERED),
+                VAEvent(
+                    VAEventType.BROWSER_REGISTERED, {"browser_id": self.browser_id}
+                ),
             )
         else:
             self._send_event(
@@ -204,7 +211,7 @@ class WebsocketListenerHandler:
 
         # Add config data to event
         if event.event_name in [
-            VAEventType.CONFIG_UPDATE,
+            VAEventType.STATUS_CHANGE,
             VAEventType.BROWSER_REGISTERED,
             VAEventType.BROWSER_UNREGISTERED,
         ]:
@@ -218,10 +225,9 @@ class WebsocketListenerHandler:
         if event.event_name in [
             VAEventType.BROWSER_REGISTERED,
             VAEventType.BROWSER_UNREGISTERED,
-            VAEventType.CONFIG_UPDATE,
-            VAEventType.ASSIST_LISTENING,
+            VAEventType.STATUS_CHANGE,
+            VAEventType.ASSIST_STATE_CHANGE,
             VAEventType.NAVIGATION,
-            VAEventType.TIMER_UPDATE,
             VAEventType.RELOAD,
         ]:
             _LOGGER.debug(
@@ -248,64 +254,9 @@ class WebsocketListenerHandler:
         if self.entity_id and config:
             if config.disabled_by:
                 return output
-
-            data = config.runtime_data
-            timer_info = {}
-            if timers := TimerManager.get(self.hass):
-                timer_info = timers.get_timers_as_dict(
-                    entity_id=self.entity_id, include_expired=True
-                )
-
-            menu_info = {}
-            if menu_manager := MenuManager.get(self.hass, config):
-                menu_info["status_icons"] = (
-                    menu_manager.status_icons.copy() if menu_manager else []
-                )
-                menu_info["menu_items"] = (
-                    menu_manager.menu_items.copy() if menu_manager else []
-                )
-                menu_info["menu_active"] = (
-                    menu_manager.active if menu_manager else False
-                )
-                menu_info["menu_config"] = data.dashboard.display_settings.menu_config
-
             try:
-                output = {
-                    "browser_id": self.browser_id,
-                    "entity_id": self.entity_id,
-                    "mimic_device": self.mimic,
-                    "name": data.core.name,
-                    "mic_entity_id": data.core.mic_device,
-                    "mic_device_id": get_device_id_from_entity_id(
-                        self.hass, data.core.mic_device
-                    ),
-                    "mediaplayer_entity_id": data.core.mediaplayer_device,
-                    "mediaplayer_device_id": get_device_id_from_entity_id(
-                        self.hass, data.core.mediaplayer_device
-                    ),
-                    "musicplayer_entity_id": data.core.musicplayer_device,
-                    "musicplayer_device_id": get_device_id_from_entity_id(
-                        self.hass, data.core.musicplayer_device
-                    ),
-                    "display_device_id": data.core.display_device,
-                    "menu": menu_info,
-                    "timers": timer_info,
-                    "background": data.dashboard.background_settings.background,
-                    "dashboard": data.dashboard.dashboard,
-                    "home": data.dashboard.home
-                    if not data.runtime_config_overrides.home
-                    else data.runtime_config_overrides.home,
-                    "music": data.dashboard.music,
-                    "intent": data.dashboard.intent,
-                    "hide_sidebar": data.dashboard.display_settings.screen_mode
-                    in [
-                        VAScreenMode.HIDE_HEADER_SIDEBAR,
-                        VAScreenMode.HIDE_SIDEBAR,
-                    ],
-                    "hide_header": data.dashboard.display_settings.screen_mode
-                    in [VAScreenMode.HIDE_HEADER_SIDEBAR, VAScreenMode.HIDE_HEADER],
-                    "navigation_transition": data.dashboard.display_settings.navigation_transition,
-                }
+                if sm := StatusManager.get(self.hass, config):
+                    output = sm.as_dict()
             except Exception:  # noqa: BLE001
                 output = {}
         return output
@@ -411,8 +362,55 @@ def setup_websocket_commands(hass: HomeAssistant) -> None:
 
         connection.send_result(msg["id"], output)
 
+    # Set current path
+    @websocket_command(
+        {
+            vol.Required("type"): f"{DOMAIN}/set_current_path",
+            vol.Required("browser_id"): str,
+            vol.Required("path"): str,
+        }
+    )
+    @async_response
+    async def handle_set_current_path(
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict
+    ) -> None:
+        """Set the current path for the browser."""
+        if entity := get_entity_id_by_browser_id(hass, msg["browser_id"]):
+            if entry := get_config_entry_by_entity_id(hass, entity):
+                async_dispatcher_send(
+                    hass,
+                    f"{DOMAIN}_{entry.entry_id}_event",
+                    VAEvent(VAEventType.VIEW_UPDATE, {"path": msg["path"]}),
+                )
+
+        connection.send_result(msg["id"], {"success": True})
+
+    # Register device activity
+    @websocket_command(
+        {
+            vol.Required("type"): f"{DOMAIN}/register_activity",
+            vol.Required("browser_id"): str,
+        }
+    )
+    @async_response
+    async def handle_register_activity(
+        hass: HomeAssistant, connection: ActiveConnection, msg: dict
+    ) -> None:
+        """Register screen activity for the browser's device."""
+        if entity := get_entity_id_by_browser_id(hass, msg["browser_id"]):
+            if entry := get_config_entry_by_entity_id(hass, entity):
+                async_dispatcher_send(
+                    hass,
+                    f"{DOMAIN}_{entry.entry_id}_event",
+                    VAEvent(VAEventType.SCREEN_ACTIVITY),
+                )
+
+        connection.send_result(msg["id"], {"success": True})
+
     # Register commands
     async_register_command(hass, handle_connect)
     async_register_command(hass, handle_get_entity_by_browser_id)
     async_register_command(hass, handle_get_server_time)
     async_register_command(hass, handle_get_timer_by_name)
+    async_register_command(hass, handle_set_current_path)
+    async_register_command(hass, handle_register_activity)

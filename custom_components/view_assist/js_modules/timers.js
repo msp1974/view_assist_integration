@@ -39,7 +39,7 @@ class TimerCards {
             }
 
             const timerIcon = () => {
-                switch(timer.timer_class) {
+                switch (timer.timer_class) {
                     case "alarm":
                         return "mdi:bell-outline";
                     case "reminder":
@@ -149,7 +149,7 @@ class TimerCards {
                         { "height": "20%" },
                         { "padding": "0" },
                         { "justify-self": "center" },
-                        { "width": "90vw"}
+                        { "width": "90vw" }
                     ],
                     "icon": [
                         { "color": "white" },

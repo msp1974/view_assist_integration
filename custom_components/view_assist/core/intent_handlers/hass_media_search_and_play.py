@@ -167,7 +167,7 @@ class VAMediaSearchAndPlayHandler(intent.IntentHandler):
 
         # Populate media player from extra_data if not provided in the slots, e.g. from a VADeviceInfo context
         if not entity_name and extra_data:
-            entity_name = extra_data.get("media_player")
+            entity_name = extra_data.get("music_player")
 
         # Find matching entities
         match_constraints = intent.MatchTargetsConstraints(
@@ -234,7 +234,7 @@ class VAMediaSearchAndPlayHandler(intent.IntentHandler):
         best_candidate = self._select_best_media_match(
             search_query, candidates, media_class_value, intent_obj.language
         )
-        _LOGGER.warning("Best media match: %s", best_candidate.as_speech_dict())
+        _LOGGER.info("Best media match: %s", best_candidate.as_speech_dict())
         try:
             await hass.services.async_call(
                 MEDIA_PLAYER_DOMAIN,
@@ -392,7 +392,7 @@ class VAMediaSearchAndPlayHandler(intent.IntentHandler):
                 else []
             )
 
-        _LOGGER.warning("Searching Music Assistant with data: %s", search_data)
+        _LOGGER.debug("Searching Music Assistant with data: %s", search_data)
 
         try:
             response = await hass.services.async_call(
@@ -501,7 +501,7 @@ class VAMediaSearchAndPlayHandler(intent.IntentHandler):
         title_term, artist_term, inferred_class = self._parse_search_query(
             search_query, language
         )
-        _LOGGER.warning(
+        _LOGGER.info(
             "Parsed search query: title=%s, artist=%s, inferred_class=%s",
             title_term,
             artist_term,
@@ -529,7 +529,7 @@ class VAMediaSearchAndPlayHandler(intent.IntentHandler):
             c for c in candidates if c.name and c.name.strip().lower() == whole_term
         ]
         if exact_matches:
-            _LOGGER.warning("Exact whole-term match(es): %s", exact_matches)
+            _LOGGER.debug("Exact whole-term match(es): %s", exact_matches)
             return best_of(exact_matches)
 
         # Stage 2: fuzzy match of the whole search term against the name
@@ -545,7 +545,7 @@ class VAMediaSearchAndPlayHandler(intent.IntentHandler):
             fuzzy_matches = [
                 c for c in candidates if whole_term_score(c) == best_fuzzy_score
             ]
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Fuzzy whole-term match(es) (score=%s): %s",
                 best_fuzzy_score,
                 fuzzy_matches,
@@ -572,7 +572,7 @@ class VAMediaSearchAndPlayHandler(intent.IntentHandler):
 
         best_split_score = max(split_score(c) for c in candidates)
         split_matches = [c for c in candidates if split_score(c) == best_split_score]
-        _LOGGER.warning(
+        _LOGGER.debug(
             "Split title/artist match(es) (score=%s): %s",
             best_split_score,
             split_matches,

@@ -63,6 +63,11 @@ def discover_intent_handler_classes() -> dict[str, type[IntentHandler]]:
     return handler_classes
 
 
+def discover_sentence_files(path: Path) -> list[Path]:
+    """Discover sentence files in the given path."""
+    return list(path.glob("*.yaml")) if path.is_dir() else []
+
+
 def intent_to_dict(intent_obj: Intent) -> dict[str, Any]:
     """Convert the intent object to a dictionary."""
     return {
@@ -225,7 +230,9 @@ class IntentsManager:
 
         # Register every sentence file found for the supported language
         va_custom_sentences_dir = Path(va_custom_sentence_path, language)
-        for src in va_custom_sentences_dir.glob("*.yaml"):
+        for src in await self.hass.async_add_executor_job(
+            discover_sentence_files, va_custom_sentences_dir
+        ):
             dest = custom_sentences_dir / src.name
             if not dest.exists():
                 dest.symlink_to(src)
@@ -245,7 +252,9 @@ class IntentsManager:
 
         # Remove the symlinks for every sentence file found for the supported language
         va_custom_sentences_dir = Path(va_custom_sentence_path, language)
-        for src in va_custom_sentences_dir.glob("*.yaml"):
+        for src in await self.hass.async_add_executor_job(
+            discover_sentence_files, va_custom_sentences_dir
+        ):
             dest = custom_sentences_dir / src.name
             if dest.exists() and dest.is_symlink():
                 dest.unlink()
@@ -340,7 +349,7 @@ class DeviceInfoData:
         )
 
     @property
-    def media_player(self) -> str | None:
+    def music_player(self) -> str | None:
         """Get the media player entity id for the device."""
         return (
             get_entity_attribute(self.hass, self.entity_id, "musicplayer_device")
@@ -353,6 +362,6 @@ class DeviceInfoData:
         """Get device information as a dictionary."""
         return {
             "name": self.entity_name,
-            "media_player": self.media_player,
+            "music_player": self.music_player,
             "entity_id": self.entity_id,
         }
