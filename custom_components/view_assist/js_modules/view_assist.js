@@ -1,6 +1,6 @@
 import { timerCards } from "./timers.js?v=1.0.30";
 
-const version = "1.0.32-rc2"
+const version = "1.0.32-rc3"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 const INITIAL_LOAD_OVERLAY_ID = "view-assist-initial-load-overlay";
@@ -9,6 +9,8 @@ const INITIAL_LOAD_FADE_MS = 400;
 function show_initial_loading_screen() {
   // Hide the unstyled/unhidden page immediately (no transition) and cover it
   // with a plain black screen while View Assist connects and configures itself
+  // Only perform if registered device
+  if (self.localStorage.getItem("view_assist_status") !== "registered") return;
   if (document.getElementById(INITIAL_LOAD_OVERLAY_ID)) return;
 
   if (document.body) document.body.style.opacity = "0";
