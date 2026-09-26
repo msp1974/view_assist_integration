@@ -48,7 +48,7 @@ class VACancelTimerIntentHandler(intent.IntentHandler):
         self, intent_obj: intent.Intent, extra_data: dict | None = None
     ) -> intent.IntentResponse:
         """Handle the intent with custom logic."""
-        _LOGGER.warning(
+        _LOGGER.info(
             "%s invoked with intent: %s -> %s -> %s -> %s",
             self.__class__.__name__,
             intent_obj.intent_type,
@@ -116,15 +116,34 @@ class VACancelTimerIntentHandler(intent.IntentHandler):
 
         if any(
             t in slots
-            for t in ("start_days", "start_hours", "start_minutes", "start_seconds")
+            for t in (
+                "start_days",
+                "start_hours",
+                "start_minutes",
+                "start_seconds",
+                "days",
+                "hours",
+                "minutes",
+                "seconds",
+            )
         ):
             slot_duration = Duration(
-                days=slots.get("start_days", {"value": 0})["value"] if slots else 0,
-                hours=slots.get("start_hours", {"value": 0})["value"] if slots else 0,
-                minutes=slots.get("start_minutes", {"value": 0})["value"]
+                days=slots.get("start_days", slots.get("days", {"value": 0}))["value"]
                 if slots
                 else 0,
-                seconds=slots.get("start_seconds", {"value": 0})["value"]
+                hours=slots.get("start_hours", slots.get("hours", {"value": 0}))[
+                    "value"
+                ]
+                if slots
+                else 0,
+                minutes=slots.get("start_minutes", slots.get("minutes", {"value": 0}))[
+                    "value"
+                ]
+                if slots
+                else 0,
+                seconds=slots.get("start_seconds", slots.get("seconds", {"value": 0}))[
+                    "value"
+                ]
                 if slots
                 else 0,
             )
