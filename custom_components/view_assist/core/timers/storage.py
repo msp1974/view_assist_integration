@@ -6,6 +6,7 @@ import inspect
 import logging
 import time
 from typing import Any
+from .typed import Duration
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -61,6 +62,11 @@ class VATimerStore:
                         if timer.remaining_info
                         else TimerRemainingInfo()
                     )
+                    timer.remaining_info.duration = (
+                        Duration(**timer.remaining_info.duration)
+                        if timer.remaining_info.duration
+                        else Duration()
+                    )
                     timer.snooze_info = (
                         SnoozeInfo(**timer.snooze_info)
                         if timer.snooze_info
@@ -79,12 +85,6 @@ class VATimerStore:
         self.dirty = True
         if timer_id in self.timers:
             self.timers[timer_id].updated_at = time.mktime(dt_util.now().timetuple())
-
-        async_dispatcher_send(
-            self.hass,
-            f"{DOMAIN}_event",
-            VAEvent(VAEventType.TIMER_UPDATE),
-        )
 
         for callback in self.listeners.values():
             if inspect.iscoroutinefunction(callback):

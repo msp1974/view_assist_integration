@@ -66,7 +66,7 @@ JSMODULES = [
     {
         "name": "View Assist Helper",
         "filename": "view_assist.js",
-        "version": "1.0.31",
+        "version": "1.0.32-rc2",
     },
 ]
 # mins between checks for updated versions of dashboard and views
@@ -85,14 +85,19 @@ class VAMode(StrEnum):
     GAME = "game"
 
 
-VAMODE_REVERTS = {
-    VAMode.NORMAL: {"revert": True, "view": "home"},
-    VAMode.MUSIC: {"revert": True, "view": "music"},
-    VAMode.CYCLE: {"revert": False},
-    VAMode.HOLD: {"revert": False},
-    VAMode.NIGHT: {"revert": True, "view": "home"},
-}
-
+MUSIC_MEDIA_TYPES = (
+    "music",
+    "podcast",
+    "episode",
+    "track",
+    "album",
+    "playlist",
+    "artist",
+    "composer",
+    "contributing_artist",
+    "channel",
+    "channels",
+)
 
 # Config keys
 DATA = "data"
