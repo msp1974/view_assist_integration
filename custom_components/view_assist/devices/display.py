@@ -47,8 +47,6 @@ class DisplayManager(DeviceModule):
         self._mode_history: list[str] = [VAMode.NORMAL]
         self._activity_monitoring_task: Task | None = None
 
-        self._timeout_mode: TimeOutMode = TimeOutMode.NORMAL
-
         self._cycle_interval: int = 15
         self._cycle_current_view_index: int = 0
 
@@ -72,40 +70,33 @@ class DisplayManager(DeviceModule):
         """Start monitoring inactivity for the display device."""
         sm = StatusManager.get(self._hass, self._config)
         with contextlib.suppress(asyncio.CancelledError):
-            try:
-                while True:
-                    await asyncio.sleep(1)  # Check inactivity every 1 second
+            while True:
+                await asyncio.sleep(1)  # Check inactivity every 1 second
 
-                    # Skip if assist is active, on hold screen, or timer is sounding
-                    if (
-                        sm.assist_state != AssistSatelliteState.IDLE
-                        or (sm.hold and sm.current_path == sm.hold_view)
-                        or sm.alarm_sounding
-                    ):
-                        continue
+                # Skip if assist is active, on hold screen, or timer is sounding
+                if (
+                    sm.assist_state != AssistSatelliteState.IDLE
+                    or (sm.hold and sm.current_path == sm.hold_view)
+                    or sm.alarm_sounding
+                ):
+                    continue
 
-                    timeout = (
-                        sm.config.default.view_timeout
-                        if sm.mode != VAMode.CYCLE
-                        else self._cycle_interval
-                    )
-
-                    if (
-                        sm.last_activity
-                        and dt_util.now() - sm.last_activity
-                        > timedelta(seconds=timeout)
-                    ):
-                        view = self._choose_inactivity_view(sm)
-
-                        if view and sm.current_path != view:
-                            if nm := NavigationManager.get(self._hass, self._config):
-                                nm.browser_navigate(view)
-            except Exception as e:
-                _LOGGER.error(
-                    "Error occurred during inactivity monitoring for device %s: %s",
-                    self._config.runtime_data.core.name,
-                    str(e),
+                timeout = (
+                    sm.config.default.view_timeout
+                    if sm.mode != VAMode.CYCLE
+                    else self._cycle_interval
                 )
+
+                if sm.force_activity_timeout_flag or (
+                    sm.last_activity
+                    and dt_util.now() - sm.last_activity > timedelta(seconds=timeout)
+                ):
+                    sm.force_activity_timeout_flag = False
+                    view = self._choose_inactivity_view(sm)
+
+                    if view and sm.current_path != view:
+                        if nm := NavigationManager.get(self._hass, self._config):
+                            nm.browser_navigate(view)
 
     def _choose_inactivity_view(self, sm: StatusManager) -> str | None:
         """Handle navigation when inactivity timeout occurs."""
