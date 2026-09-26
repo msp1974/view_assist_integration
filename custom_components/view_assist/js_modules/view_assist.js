@@ -382,7 +382,7 @@ class ViewAssist {
 
   async hide_sections() {
     // Hide header and sidebar
-    if (!this.variables.config?.mimic_device) {
+    if (!this.variables.config?.is_mimic) {
       await this.hide_header(this.variables.config?.hide_header);
       await this.hide_sidebar(this.variables.config?.hide_sidebar);
     }
@@ -706,7 +706,7 @@ class ViewAssist {
     // Handle incomming messages from the server
     const event = msg["event"];
     const payload = msg["payload"];
-    const is_mimic = this.variables.config?.mimic_device;
+    const is_mimic = this.variables.config?.is_mimic;
 
     //console.log("Event: " + event + ", Payload: " + JSON.stringify(payload));
 
@@ -736,9 +736,6 @@ class ViewAssist {
       case "status_change":
         this.process_config(event, payload);
         break;
-      case "timer_update":
-        this.variables.config.timers = payload
-        break;
       case "navigate":
         if (!is_mimic) {
           if (payload["variables"]) {
@@ -759,7 +756,6 @@ class ViewAssist {
 
   process_config(event, payload) {
     let reload = false;
-    const old_config = this.variables?.config
 
     if (event == "registered") {
       reload = true;
@@ -803,7 +799,7 @@ class ViewAssist {
     // Navigate the browser window
     if (!path) return;
     if (this.is_current_path(path)) return;
-    if (this.variables.config?.navigation_transition) {
+    if (this.variables.config?.config?.dashboard?.display_settings?.navigation_transition) {
       this.fade_navigate(path);
       return;
     }
