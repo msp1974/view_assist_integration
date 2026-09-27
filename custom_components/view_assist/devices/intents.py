@@ -1,6 +1,7 @@
 """Intents for View Assist Devices to take action on the basis of fired intents."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.conversation import ChatLog, ToolResultContent
 from homeassistant.core import (
@@ -92,7 +93,10 @@ class DeviceIntentsHandler(DeviceModule):
         return True
 
     async def async_handle_intent(
-        self, intent_obj: intent.Intent, response: intent.IntentResponse
+        self,
+        intent_obj: intent.Intent,
+        response: intent.IntentResponse,
+        view_data: dict[str, Any] | None = None,
     ) -> None:
         """Handle the intent dispatched for the device."""
 
@@ -121,8 +125,10 @@ class DeviceIntentsHandler(DeviceModule):
                 for target in response.success_results
                 if target.type == "entity"
             ],
-            "view_data": None,
         }
+
+        if view_data is not None:
+            payload["view_data"] = view_data
 
         async_dispatcher_send(
             self._hass,

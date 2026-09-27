@@ -4,12 +4,13 @@ from typing import override
 
 import voluptuous as vol
 
-from homeassistant.helpers import intent
+from homeassistant.helpers.intent import Intent, IntentResponse
 
 from ...const import DOMAIN  # noqa: TID252
+from . import IntentOverrideHandler
 
 
-class VASetModeIntentHandler(intent.IntentHandler):
+class VASetModeIntentHandler(IntentOverrideHandler):
     """Change View Asist Modes."""
 
     intent_type = "ViewAssistSetMode"
@@ -27,8 +28,8 @@ class VASetModeIntentHandler(intent.IntentHandler):
 
     @override
     async def async_handle(
-        self, intent_obj: intent.Intent, extra_data: dict | None = None
-    ) -> intent.IntentResponse:
+        self, intent_obj: Intent, extra_data: dict | None = None
+    ) -> IntentResponse:
         """Change View Assist mode."""
         hass = intent_obj.hass
         mode = intent_obj.slots["mode"]["value"]

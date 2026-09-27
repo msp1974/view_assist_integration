@@ -107,6 +107,13 @@ class DisplayManager(DeviceModule):
         if sm.mode == VAMode.CYCLE:
             return self._get_cycle_next_view()
 
+        if sm.config.dashboard.display_settings.keep_timer_screen_on and sm.has_timers:
+            return (
+                sm.config.dashboard.timers
+                if sm.current_path != sm.config.dashboard.timers
+                else None
+            )
+
         if sm.is_music_playing:
             return (
                 sm.config.dashboard.music

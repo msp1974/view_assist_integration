@@ -9,11 +9,12 @@ from homeassistant.helpers import config_validation as cv, intent
 from homeassistant.util import dt as dt_util
 
 from ..timers import Duration, TimerClass, TimerHelpers, TimerManager  # noqa: TID252
+from . import IntentOverrideHandler
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class VACancelTimerIntentHandler(intent.IntentHandler):
+class VACancelTimerIntentHandler(IntentOverrideHandler):
     """Intent handler for Cancel Timer intents."""
 
     intent_type = intent.INTENT_CANCEL_TIMER

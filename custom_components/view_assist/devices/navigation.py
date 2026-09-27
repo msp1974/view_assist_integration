@@ -1,6 +1,7 @@
 """Navigation manager."""
 
 import logging
+from typing import Any
 
 import voluptuous as vol
 
@@ -77,10 +78,7 @@ class NavigationManager(DeviceModule):
         NavigationManagerServices(self._hass).unregister()
         return True
 
-    def browser_navigate(
-        self,
-        path: str,
-    ):
+    def browser_navigate(self, path: str, view_data: dict[str, Any] | None = None):
         """Navigate browser to defined view.
 
         Optionally revert to another view after timeout.
@@ -89,6 +87,14 @@ class NavigationManager(DeviceModule):
         # If not a display device then return.  Allows navigation to be called from other devices (e.g. mic) without error
         if self._config.runtime_data.core.type not in DISPLAY_DEVICE_TYPES:
             return
+
+        # Set view data if provided
+        if view_data is not None:
+            async_dispatcher_send(
+                self._hass,
+                f"{DOMAIN}_{self._config.entry_id}_event",
+                VAEvent(VAEventType.INTENT_UPDATE, {"view_data": view_data}),
+            )
 
         # Validate path
         if not path.startswith("/"):
@@ -107,6 +113,17 @@ class NavigationManager(DeviceModule):
             f"{DOMAIN}_{self._config.entry_id}_event",
             VAEvent(VAEventType.NAVIGATION, {"path": path}),
         )
+
+    def navigate_to_view(self, view: str, view_data: dict[str, Any] | None = None):
+        """Navigate browser to a specific view."""
+
+        # Attempt to get view path from config
+        if hasattr(self._config.runtime_data.dashboard, view):
+            path = getattr(self._config.runtime_data.dashboard, view)
+        else:
+            dashboard = self._config.runtime_data.dashboard.dashboard
+            path = f"/{dashboard.removeprefix('/').removesuffix('/')}/{view}"
+        self.browser_navigate(path=path, view_data=view_data)
 
     def navigate_home(self):
         """Navigate browser to home view."""

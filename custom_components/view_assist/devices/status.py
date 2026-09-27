@@ -10,7 +10,7 @@ Setting the hold value when mode is set to hold instead of setting mode to hold 
 
 import contextlib
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 from typing import Any
 
@@ -30,7 +30,6 @@ from ..const import DEVICES, DOMAIN, MUSIC_MEDIA_TYPES, VAMode  # noqa: TID252
 from ..core.timers import Timer, TimerEvent, TimerManager  # noqa: TID252
 from ..helpers import (  # noqa: TID252
     get_device_id_from_entity_id,
-    get_mimic_entity_id,
     get_sensor_entity_from_instance,
 )
 from ..typed import (  # noqa: TID252
@@ -294,7 +293,7 @@ class StatusManager(DeviceModule, Status):
             self._hass, NOTIFY_DEBOUNCE_SECONDS, _notify
         )
 
-    async def _async_event_handler(self, event: VAEvent) -> None:
+    async def _async_event_handler(self, event: VAEvent) -> None:  # noqa: C901
         """Handle events dispatched to this status manager."""
         event_type = event.event_name
 
@@ -387,11 +386,16 @@ class StatusManager(DeviceModule, Status):
         elif event_type == VAEventType.INTENT_UPDATE:
             # Process intent update payload
             payload = event.payload
-            self.last_intent = payload.get("intent")
-            self.last_command = payload.get("command")
-            self.last_response = payload.get("response")
-            self.changed_entities = payload.get("changed_entities", [])
-            self.view_data = payload.get("view_data")
+            if "intent" in payload:
+                self.last_intent = payload.get("intent")
+            if "command" in payload:
+                self.last_command = payload.get("command")
+            if "response" in payload:
+                self.last_response = payload.get("response")
+            if "changed_entities" in payload:
+                self.changed_entities = payload.get("changed_entities", [])
+            if "view_data" in payload:
+                self.view_data = payload.get("view_data")
 
             self.register_activity()
 

@@ -135,6 +135,7 @@ class DisplayConfig:
     screen_mode: VAScreenMode | None = None
     cycle_views: list[str] = field(default_factory=list)
     navigation_transition: bool = False
+    keep_timer_screen_on: bool = False
 
 
 @dataclass
@@ -147,6 +148,7 @@ class DashboardConfig:
     music: str | None = None
     intent: str | None = None
     list_view: str | None = None
+    info: str | None = None
     background_settings: BackgroundConfig = field(default_factory=BackgroundConfig)
     display_settings: DisplayConfig = field(default_factory=DisplayConfig)
 
