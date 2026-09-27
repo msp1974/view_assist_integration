@@ -6,14 +6,16 @@ import voluptuous as vol
 
 from homeassistant.const import ATTR_DEVICE_ID, ATTR_ID, ATTR_NAME
 from homeassistant.helpers import config_validation as cv, intent
+from homeassistant.helpers.intent import Intent, IntentResponse
 from homeassistant.util import dt as dt_util
 
 from ..timers import Duration, TimerManager, TimerStatus  # noqa: TID252
+from . import IntentOverrideHandler
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class VATimerStatusIntentHandler(intent.IntentHandler):
+class VATimerStatusIntentHandler(IntentOverrideHandler):
     """Intent handler for Timer Status intents."""
 
     intent_type = intent.INTENT_TIMER_STATUS
@@ -34,8 +36,8 @@ class VATimerStatusIntentHandler(intent.IntentHandler):
         }
 
     async def async_handle(
-        self, intent_obj: intent.Intent, extra_data: dict | None = None
-    ) -> intent.IntentResponse:
+        self, intent_obj: Intent, extra_data: dict | None = None
+    ) -> IntentResponse:
         """Handle the intent with custom logic."""
         _LOGGER.warning(
             "%s invoked with intent: %s -> %s -> %s -> %s",

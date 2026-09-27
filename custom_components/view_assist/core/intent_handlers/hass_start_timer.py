@@ -6,14 +6,21 @@ import traceback
 import voluptuous as vol
 
 from homeassistant.helpers import config_validation as cv, intent
+from homeassistant.helpers.intent import (
+    Intent,
+    IntentHandleError,
+    IntentResponse,
+    IntentResponseErrorCode,
+)
 from homeassistant.util import dt as dt_util
 
 from ..timers import Duration, TimerClass, TimerHelpers, TimerManager  # noqa: TID252
+from . import IntentOverrideHandler
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class VAStartTimerIntentHandler(intent.IntentHandler):
+class VAStartTimerIntentHandler(IntentOverrideHandler):
     """Intent handler for Start Timer intents."""
 
     intent_type = intent.INTENT_START_TIMER
@@ -43,8 +50,8 @@ class VAStartTimerIntentHandler(intent.IntentHandler):
         }
 
     async def async_handle(
-        self, intent_obj: intent.Intent, extra_data: dict | None = None
-    ) -> intent.IntentResponse:
+        self, intent_obj: Intent, extra_data: dict | None = None
+    ) -> IntentResponse:
         """Handle the intent with custom logic."""
         _LOGGER.debug(
             "%s invoked with intent: %s -> %s -> %s -> %s",
@@ -152,13 +159,13 @@ class VAStartTimerIntentHandler(intent.IntentHandler):
 
         response = intent_obj.create_response()
         response.async_set_error(
-            intent.IntentResponseErrorCode.FAILED_TO_HANDLE,
+            IntentResponseErrorCode.FAILED_TO_HANDLE,
             f"Failed to set {timer_class} for {intent_obj.slots.get('time', {}).get('value') or intent_obj.text_input}",
         )
         return response
 
 
-class TimerUnableToDecodeError(intent.IntentHandleError):
+class TimerUnableToDecodeError(IntentHandleError):
     """Error when a timer could not be decoded."""
 
     def __init__(self) -> None:

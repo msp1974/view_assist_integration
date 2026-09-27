@@ -147,6 +147,7 @@ class DashboardConfig:
     music: str | None = None
     intent: str | None = None
     list_view: str | None = None
+    info: str | None = None
     background_settings: BackgroundConfig = field(default_factory=BackgroundConfig)
     display_settings: DisplayConfig = field(default_factory=DisplayConfig)
 

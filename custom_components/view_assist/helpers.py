@@ -131,6 +131,14 @@ def get_config_entry_by_entity_id(hass: HomeAssistant, entity_id: str) -> VAConf
     return None
 
 
+def get_config_entry_by_device_id(hass: HomeAssistant, device_id: str) -> VAConfigEntry:
+    """Get config entry by device id."""
+    device_registry = dr.async_get(hass)
+    if device := device_registry.async_get(device_id):
+        return hass.config_entries.async_get_entry(device.config_entry_id)
+    return None
+
+
 def get_master_config_entry(hass: HomeAssistant) -> VAConfigEntry:
     """Get master config entry."""
     if entries := get_integration_entries(hass, VAType.MASTER_CONFIG):

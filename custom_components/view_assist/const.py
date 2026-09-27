@@ -116,6 +116,7 @@ CONF_HOME = "home"
 CONF_TIMERS = "timers"
 CONF_INTENT = "intent"
 CONF_LIST = "list_view"
+CONF_INFO = "info"
 CONF_MUSIC = "music"
 CONF_CLIMATE = "thermostat"
 CONF_CAMERA = "camera"
@@ -173,6 +174,7 @@ DEFAULT_VALUES = {
     CONF_MUSIC: "/view-assist/music",
     CONF_INTENT: "/view-assist/intent",
     CONF_LIST: "/view-assist/list",
+    CONF_INFO: "/view-assist/info",
     CONF_BACKGROUND_SETTINGS: {
         CONF_BACKGROUND_MODE: VABackgroundMode.DEFAULT_BACKGROUND,
         CONF_BACKGROUND: "/view_assist/dashboard/background.jpg",

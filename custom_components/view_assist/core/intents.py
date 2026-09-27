@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import importlib
 import inspect
-from inspect import signature
 import logging
 from pathlib import Path
 import pkgutil
@@ -28,6 +27,7 @@ from ..const import (  # noqa: TID252
     INSTALL_CUSTOM_SENTENCES,
 )
 from ..helpers import (  # noqa: TID252
+    get_config_entry_by_device_id,
     get_entity_attribute,
     get_entity_id_from_conversation_device_id,
 )
@@ -289,10 +289,22 @@ class IntentHookHandler(IntentHandler):
             intent_to_dict(intent_obj),
         )
 
-        response = await self.call_handler(self.handler, intent_obj)
+        if isinstance(self.handler, intent_handlers.IntentOverrideHandler):
+            if hasattr(self.handler, "async_handle"):
+                result = await self.handler.async_handle(
+                    intent_obj=intent_obj,
+                    extra_data=DeviceInfoData(intent_obj).device_info,
+                )
+                if isinstance(result, intent_handlers.IntentOverrideResponse):
+                    response = result.response
+                    view_data = result.view_data
 
-        if self.call_original and self.original_handler:
-            response = await self.call_handler(self.original_handler, intent_obj)
+                if self.call_original and self.original_handler:
+                    response = await self.original_handler.async_handle(
+                        intent_obj=intent_obj
+                    )
+        else:
+            response = await self.handler.async_handle(intent_obj=intent_obj)
 
         _LOGGER.debug(
             "%s response: %s",
@@ -306,22 +318,9 @@ class IntentHookHandler(IntentHandler):
             f"{intent_obj.device_id}-intent_handled",
             intent_obj,
             response,
+            view_data,
         )
-
         return response
-
-    async def call_handler(
-        self, handler: IntentHandler, intent_obj: Intent
-    ) -> IntentResponse:
-        """Call the given intent handler with the provided intent object."""
-        # check if handler has an extra_data parameter in async_handle
-        sig = signature(handler.async_handle)
-        if "extra_data" in sig.parameters:
-            return await handler.async_handle(
-                intent_obj=intent_obj,
-                extra_data=DeviceInfoData(intent_obj).device_info,
-            )
-        return await handler.async_handle(intent_obj=intent_obj)
 
 
 class DeviceInfoData:
@@ -338,6 +337,15 @@ class DeviceInfoData:
         return get_entity_id_from_conversation_device_id(
             self.hass, self.conversation_device_id
         )
+
+    @property
+    def entry_id(self) -> str | None:
+        """Get the entry id for the device."""
+        if entry := get_config_entry_by_device_id(
+            self.hass, self.conversation_device_id
+        ):
+            return entry.entry_id
+        return None
 
     @property
     def entity_name(self) -> str | None:
@@ -364,4 +372,5 @@ class DeviceInfoData:
             "name": self.entity_name,
             "music_player": self.music_player,
             "entity_id": self.entity_id,
+            "entry_id": self.entry_id,
         }
