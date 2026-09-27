@@ -25,6 +25,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, entity_registry as er, intent
 
+from . import IntentOverrideHandler, IntentOverrideResponse
+
 _LOGGER = logging.getLogger(__name__)
 
 # Domain/service used to search via a Music Assistant config entry directly,
@@ -119,7 +121,7 @@ class _MediaCandidate:
         return {**self.raw, "title": title, "media_class": self.media_class}
 
 
-class VAMediaSearchAndPlayHandler(intent.IntentHandler):
+class VAMediaSearchAndPlayHandler(IntentOverrideHandler):
     """Custom intent handler for media search and play."""
 
     intent_type = INTENT_MEDIA_SEARCH_AND_PLAY
