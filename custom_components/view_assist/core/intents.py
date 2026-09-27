@@ -289,6 +289,8 @@ class IntentHookHandler(IntentHandler):
             intent_to_dict(intent_obj),
         )
 
+        view_data = {}
+
         if isinstance(self.handler, intent_handlers.IntentOverrideHandler):
             if hasattr(self.handler, "async_handle"):
                 result = await self.handler.async_handle(
@@ -298,6 +300,8 @@ class IntentHookHandler(IntentHandler):
                 if isinstance(result, intent_handlers.IntentOverrideResponse):
                     response = result.response
                     view_data = result.view_data
+                else:
+                    response = result
 
                 if self.call_original and self.original_handler:
                     response = await self.original_handler.async_handle(
