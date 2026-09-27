@@ -135,6 +135,7 @@ class DisplayConfig:
     screen_mode: VAScreenMode | None = None
     cycle_views: list[str] = field(default_factory=list)
     navigation_transition: bool = False
+    keep_timer_screen_on: bool = False
 
 
 @dataclass

@@ -20,7 +20,6 @@ from homeassistant.helpers.selector import (
     ConversationAgentSelector,
     DeviceSelector,
     DeviceSelectorConfig,
-    EntityFilterSelectorConfig,
     EntitySelector,
     EntitySelectorConfig,
     NumberSelector,
@@ -50,6 +49,7 @@ from .const import (
     CONF_HOME,
     CONF_INTENT,
     CONF_INTENT_DEVICE,
+    CONF_KEEP_TIMER_SCREEN_ON,
     CONF_LIST,
     CONF_MEDIAPLAYER_DEVICE,
     CONF_MENU_CONFIG,
@@ -298,6 +298,7 @@ async def get_dashboard_options_schema(
             )
         ),
         vol.Optional(CONF_NAVIGATION_TRANSITION): BooleanSelector(),
+        vol.Optional(CONF_KEEP_TIMER_SCREEN_ON): BooleanSelector(),
     }
 
     BACKGROUND_SETTINGS.update(background_extra)
