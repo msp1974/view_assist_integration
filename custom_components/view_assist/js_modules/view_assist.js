@@ -1,6 +1,6 @@
 import { timerCards } from "./timers.js?v=1.0.30";
 
-const version = "1.0.32-rc3"
+const version = "1.0.32-rc4"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 const INITIAL_LOAD_OVERLAY_ID = "view-assist-initial-load-overlay";
@@ -881,7 +881,7 @@ class ViewAssist {
     document.body.appendChild(htmlElement);
 
     // Load html from url
-    const html_response = await fetch("/view_assist/dashboard/overlay.html");
+    const html_response = await fetch("/view_assist/dashboard/overlay.html?v=" + Date.now());
     if (!html_response.ok) {
       console.error("Overlay HTML not found - no overlays will be displayed");
       return;
@@ -891,7 +891,7 @@ class ViewAssist {
     htmlElement.shadowRoot.innerHTML = await html_response.text();
 
     var st = document.createElement("style");
-    const css_response = await fetch("/view_assist/dashboard/overlay.css");
+    const css_response = await fetch("/view_assist/dashboard/overlay.css?v=" + Date.now());
     if (!css_response.ok) {
       console.error("Overlay CSS not found - no overlays will be displayed");
       return;
@@ -901,13 +901,13 @@ class ViewAssist {
     // Add custom overlays html/css
     try {
       // Load custom overlays html
-      const response = await fetch("/view_assist/custom_overlays/overlay.html");
+      const response = await fetch("/view_assist/custom_overlays/overlay.html?v=" + Date.now());
       if (response.ok) {
         const custom_html = await response.text();
         htmlElement.shadowRoot.innerHTML += custom_html;
 
         // Load custom css
-        const custom_css = await fetch("/view_assist/custom_overlays/overlay.css");
+        const custom_css = await fetch("/view_assist/custom_overlays/overlay.css?v=" + Date.now());
         if (custom_css.ok) {
           st.innerHTML += await custom_css.text();
         }
