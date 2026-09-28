@@ -1,6 +1,6 @@
 import { timerCards } from "./timers.js?v=1.0.30";
 
-const version = "1.0.32-rc3"
+const version = "1.0.32-rc5"
 const TIMEOUT_ERROR = "SELECTTREE-TIMEOUT";
 
 const INITIAL_LOAD_OVERLAY_ID = "view-assist-initial-load-overlay";
@@ -10,7 +10,7 @@ function show_initial_loading_screen() {
   // Hide the unstyled/unhidden page immediately (no transition) and cover it
   // with a plain black screen while View Assist connects and configures itself
   // Only perform if registered device
-  if (self.localStorage.getItem("view_assist_status") !== "registered") return;
+  if (self.localStorage.getItem("view_assist_status") !== "registered" || self.localStorage.getItem("view_assist_mimic_device") === "true") return;
   if (document.getElementById(INITIAL_LOAD_OVERLAY_ID)) return;
 
   if (document.body) document.body.style.opacity = "0";
@@ -764,14 +764,18 @@ class ViewAssist {
     // Entity id changed
     if (payload.entity_id && payload.entity_id != localStorage.getItem("view_assist_sensor")) {
       localStorage.setItem("view_assist_sensor", payload.entity_id);
-      localStorage.setItem("view_assist_mimic_device", payload.mimic_device);
       reload = true;
+    }
+
+    // Mimic device flag
+    if (payload.is_mimic != localStorage.getItem("view_assist_mimic_device")) {
+      localStorage.setItem("view_assist_mimic_device", payload.is_mimic);
     }
 
     // Set variables to payload
     this.variables.config = payload
 
-    if (!payload.mimic_device) {
+    if (!payload.is_mimic) {
       // On register, go to default page
       if (reload) {
         this.hide_sections();
@@ -881,7 +885,7 @@ class ViewAssist {
     document.body.appendChild(htmlElement);
 
     // Load html from url
-    const html_response = await fetch("/view_assist/dashboard/overlay.html");
+    const html_response = await fetch("/view_assist/dashboard/overlay.html?v=" + Date.now());
     if (!html_response.ok) {
       console.error("Overlay HTML not found - no overlays will be displayed");
       return;
@@ -891,7 +895,7 @@ class ViewAssist {
     htmlElement.shadowRoot.innerHTML = await html_response.text();
 
     var st = document.createElement("style");
-    const css_response = await fetch("/view_assist/dashboard/overlay.css");
+    const css_response = await fetch("/view_assist/dashboard/overlay.css?v=" + Date.now());
     if (!css_response.ok) {
       console.error("Overlay CSS not found - no overlays will be displayed");
       return;
@@ -901,13 +905,13 @@ class ViewAssist {
     // Add custom overlays html/css
     try {
       // Load custom overlays html
-      const response = await fetch("/view_assist/custom_overlays/overlay.html");
+      const response = await fetch("/view_assist/custom_overlays/overlay.html?v=" + Date.now());
       if (response.ok) {
         const custom_html = await response.text();
         htmlElement.shadowRoot.innerHTML += custom_html;
 
         // Load custom css
-        const custom_css = await fetch("/view_assist/custom_overlays/overlay.css");
+        const custom_css = await fetch("/view_assist/custom_overlays/overlay.css?v=" + Date.now());
         if (custom_css.ok) {
           st.innerHTML += await custom_css.text();
         }
