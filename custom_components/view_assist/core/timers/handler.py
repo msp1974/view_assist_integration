@@ -421,16 +421,18 @@ class TimerHandler:
             if timer.timer_class == TimerClass.COMMAND
             else VA_EVENT_PREFIX
         ).format(event_type)
+
         event_data = {"timer_id": timer.id}
         event_data.update(timer.to_dict())
         self.hass.bus.async_fire(event_name, event_data)
+
         entry = get_config_entry_by_entity_id(self.hass, timer.entity_id)
         async_dispatcher_send(
             self.hass,
             f"{DOMAIN}_{entry.entry_id}_event",
             VAEvent(
-                VAEventType.TIMER_UPDATE,
-                {
+                event_name=VAEventType.TIMER_UPDATE,
+                payload={
                     "event": event_type,
                     "event_timer": timer,
                     "timers": [
