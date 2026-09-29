@@ -276,20 +276,13 @@ class TimerHandler:
         Stops whatever is sounding the alarm/reminder (announce loop, alarm
         streamer or VACA) and cancels the timer(s) that triggered it.
         """
-        sounding_timer_ids = [
-            timer.id
-            for timer in self.store.timers.values()
-            if timer.entity_id == entity_id and timer.status == TimerStatus.SOUNDING
-        ]
-
-        if not sounding_timer_ids:
-            return False
-
-        for timerid in sounding_timer_ids:
-            _LOGGER.debug("Cancelling sounding timer: %s", timerid)
-            await self.cancel_timer(timer_id=timerid, fire_event=False)
-
-        return True
+        sounding_timers = False
+        for timer in self.store.timers.values():
+            if timer.entity_id == entity_id and timer.status == TimerStatus.SOUNDING:
+                _LOGGER.debug("Cancelling sounding timer: %s", timer.id)
+                sounding_timers = True
+                await self.cancel_timer(timer_id=timer.id, fire_event=True)
+        return sounding_timers
 
     def get_timers(
         self,
@@ -427,6 +420,7 @@ class TimerHandler:
         self.hass.bus.async_fire(event_name, event_data)
 
         entry = get_config_entry_by_entity_id(self.hass, timer.entity_id)
+
         async_dispatcher_send(
             self.hass,
             f"{DOMAIN}_{entry.entry_id}_event",
@@ -434,14 +428,11 @@ class TimerHandler:
                 event_name=VAEventType.TIMER_UPDATE,
                 payload={
                     "event": event_type,
-                    "event_timer": timer,
-                    "timers": [
-                        timer.to_dict()
-                        for timer in self.get_timers(entity_id=timer.entity_id)
-                    ],
+                    "timer_id": timer.id,
                 },
             ),
         )
+
         _LOGGER.debug("Timer event fired: %s - %s", event_name, event_data)
 
     def is_duplicate_timer(self, timer: Timer) -> Timer | None:
@@ -560,7 +551,7 @@ class TimerHandler:
         except asyncio.CancelledError:
             # expected when the reminder is cancelled
             await self.store.update_status(timer_id, TimerStatus.EXPIRED)
-            self.cancel_timer(timer_id, fire_event=False)
+            await self.cancel_timer(timer_id, fire_event=True)
 
     async def _sound_timer_alarm(self, timer: Timer) -> None:
         """Sound the alarm for an expired timer/alarm.
@@ -649,7 +640,7 @@ class TimerHandler:
                 and get_mic_device_id_from_entity_id(self.hass, timer.entity_id)
                 == device_id
             ):
-                await self.cancel_timer(timer_id=timer.id, fire_event=False)
+                await self.cancel_timer(timer_id=timer.id, fire_event=True)
 
     # -------------------------------- Intent Timer Handling ---------------------------------
     # Handle intent timers for devices that have their own timer manager like ESPHome and HAVPE
