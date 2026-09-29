@@ -146,6 +146,7 @@ class ViewAssistSensor(SensorEntity):
             attrs["mute_switch"] = (
                 get_mute_switch_entity_id(self.hass, sm.config.core.mic_device),
             )
+            attrs["alarm_sounding"] = sm.alarm_sounding
         return attrs
 
     def _get_display_device_status_attributes(self) -> dict[str, Any]:

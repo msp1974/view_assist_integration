@@ -100,7 +100,7 @@ class Status:
     volume: int | None = None
     do_not_disturb: bool = False
     has_timers: bool = False
-    timers: dict[str, Timer] | None = None
+    timers: list[Timer] | None = None
     alarm_sounding: bool = False
     last_activity: datetime | None = None
     extra_data: dict[str, Any] | None = None
@@ -195,6 +195,7 @@ class StatusManager(DeviceModule, Status):
         # Get current timers
         if tm := TimerManager.get(self._hass):
             self.timers = tm.get_timers_as_dict(entity_id=self._entity_id)
+        self.has_timers = len(self.timers) > 0
 
         # Set sidebar and header bar status
         self.hide_sidebar = self.config.dashboard.display_settings.screen_mode in [
@@ -301,6 +302,8 @@ class StatusManager(DeviceModule, Status):
         if event_type == VAEventType.BROWSER_REGISTERED:
             browser_id = event.payload.get("browser_id", None)
             self.browser_connected = bool(browser_id)
+            # Force correct screen by forcing activity timeout
+            self.force_activity_timeout()
 
         # Handle browser unregistration events
         elif event_type == VAEventType.BROWSER_UNREGISTERED:
@@ -325,8 +328,9 @@ class StatusManager(DeviceModule, Status):
         # Handle timer update
         elif event_type == VAEventType.TIMER_UPDATE:
             timer_event = event.payload.get("event", None)
-            self.timers = event.payload.get("timers", {})
-            self.has_timers = bool(self.timers)
+            if tm := TimerManager.get(self._hass):
+                self.timers = tm.get_timers_as_dict(entity_id=self._entity_id)
+                self.has_timers = len(self.timers) > 0
             self.register_activity()
             _LOGGER.debug(
                 "Timers event for device %s: %s",
