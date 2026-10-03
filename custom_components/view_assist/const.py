@@ -311,5 +311,9 @@ INTENT_TO_VIEW_MAPPING = {
         "HassListRemoveItem",
     ],
     "calendar": ["ViewAssistShowCalendar"],
-    "info": ["info", "HassBroadcast"],
+    "info": [
+        "info",
+        "HassBroadcast",
+        "VAWhatDidYouSay",
+    ],
 }

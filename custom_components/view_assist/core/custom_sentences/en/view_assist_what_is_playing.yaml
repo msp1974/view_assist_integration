@@ -1,0 +1,41 @@
+language: "en"
+
+expansion_rules:
+  the: "(the|my|our)"
+  what_is: "(what's|whats|what is|tell me)"
+  currently: "(currently|presently|right now|at the moment)"
+  in: "(in|on|at)"
+  area: "[<the>] {area}"
+
+intents:
+  VAWhatIsPlaying:
+    data:
+      - sentences:
+          - "<what_is> [<the>] (song|music|track) [that is|that's] [<currently>] playing"
+          - "<what_is> [<currently>] playing"
+          - "<what_is> this [(song|track)]"
+          - "(what|which) (song|track|music) is (this|[<currently>] playing)"
+          - "(who's|who is) (singing|playing) [this|<the> (song|track|music)]"
+          - "who (sings|plays) this [(song|track)]"
+        response: what_is_playing
+      - sentences:
+          - "<what_is> [<the>] (song|music|track) [that is|that's] [<currently>] playing <in> <area>"
+          - "<what_is> [<currently>] playing <in> <area>"
+          - "(what|which) (song|track|music) is [<currently>] playing <in> <area>"
+          - "(who's|who is) (singing|playing) <in> <area>"
+        response: what_is_playing
+
+responses:
+  intents:
+    VAWhatIsPlaying:
+      what_is_playing: >-
+        {%- if state is defined and state and state.state in ['playing', 'paused'] -%}
+        {#- TRANSLATE: success. Say what is playing. Keep the {{ }} parts unchanged. -#}
+        Currently playing {{ state.attributes.media_title | default('something', true) }}
+        {%- if state.attributes.media_artist %} by {{ state.attributes.media_artist }}{% endif -%}
+        {#- TRANSLATE: only said when the user asked about a room, e.g. "in the kitchen". Keep the {{ }} part. -#}
+        {%- if slots is defined and slots.area is defined and slots.area %} in the {{ slots.area }}{% endif -%}
+        {%- else -%}
+        {#- TRANSLATE: nothing is playing. -#}
+        Nothing is playing right now.
+        {%- endif -%}
