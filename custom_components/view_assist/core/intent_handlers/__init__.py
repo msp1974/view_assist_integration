@@ -13,7 +13,7 @@ from homeassistant.helpers.intent import (
 )
 
 from ...helpers import (  # noqa: TID252
-    get_config_entry_by_device_id,
+    get_config_entry_by_conversation_device_id,
     get_entity_attribute,
     get_entity_id_from_conversation_device_id,
 )
@@ -24,6 +24,7 @@ class IntentOverrideHandler(IntentHandler):
 
     @override
     async def async_handle(self, intent_obj: Intent) -> IntentOverrideResponse:
+        """Handle the intent."""
         raise NotImplementedError
 
     def get_device_info(self, intent_obj: Intent) -> IntentDeviceInfo:
@@ -117,6 +118,11 @@ class IntentOverrideResponse:
         self.response.speech_slots = speech_slots
 
     @callback
+    def async_set_response_type(self, response_type: IntentResponseType) -> None:
+        """Set the response type for this response."""
+        self.response.response_type = response_type
+
+    @callback
     def async_set_view_data(self, view_data: dict[str, Any] | None) -> None:
         """Set the view data associated with this response."""
         self.view_data = view_data
@@ -129,6 +135,9 @@ class IntentDeviceInfo:
         """Initialize the DeviceInfo class."""
         self.hass = intent_obj.hass
         self.conversation_device_id = intent_obj.device_id
+        self._entry = get_config_entry_by_conversation_device_id(
+            self.hass, self.conversation_device_id
+        )
 
     @property
     def entity_id(self) -> str | None:
@@ -138,11 +147,14 @@ class IntentDeviceInfo:
         )
 
     @property
+    def entry(self) -> str | None:
+        """Get the config entry for the device."""
+        return self._entry
+
+    @property
     def entry_id(self) -> str | None:
         """Get the entry id for the device."""
-        if entry := get_config_entry_by_device_id(
-            self.hass, self.conversation_device_id
-        ):
+        if entry := self._entry:
             return entry.entry_id
         return None
 

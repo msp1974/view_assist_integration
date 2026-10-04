@@ -64,7 +64,9 @@ class DeviceIntentsHandler(DeviceModule):
         if device_id:
             self._config.async_on_unload(
                 async_dispatcher_connect(
-                    self._hass, f"{device_id}-intent_handled", self.async_handle_intent
+                    self._hass,
+                    f"{device_id}_intent_event",
+                    self.async_handle_intent_event,
                 )
             )
 
@@ -93,16 +95,15 @@ class DeviceIntentsHandler(DeviceModule):
             return False
         return True
 
-    async def async_handle_intent(
+    async def async_handle_intent_event(
         self,
         intent_obj: intent.Intent,
-        response: intent.IntentResponse,
+        response: intent.IntentResponse | None = None,
         view_data: dict[str, Any] | None = None,
     ) -> None:
         """Handle the intent dispatched for the device."""
 
         intent_type = intent_obj.intent_type
-        speech_text = response.speech
         sensor_entity = get_sensor_entity_from_instance(
             self._hass, self._config.entry_id
         )
@@ -113,20 +114,26 @@ class DeviceIntentsHandler(DeviceModule):
         # --------------------------------------------------------------------------------
 
         _LOGGER.debug(
-            "Handling intent '%s' for sensor entity '%s'", intent_type, sensor_entity
+            "Handling intent '%s' for sensor entity '%s' -> response '%s'",
+            intent_type,
+            sensor_entity,
+            response,
         )
 
         payload = {
             "intent": intent_type,
             "command": intent_obj.text_input,
-            "response": speech_text,
             "processed_locally": True,
-            "changed_entities": [
-                target.id
-                for target in response.success_results
-                if target.type == "entity"
-            ],
         }
+
+        if response is not None:
+            payload["changed_entities"] = (
+                [
+                    target.id
+                    for target in response.success_results
+                    if target.type == "entity"
+                ],
+            )
 
         if view_data is not None:
             payload["view_data"] = view_data
@@ -150,13 +157,11 @@ class DeviceIntentsHandler(DeviceModule):
 
         new_state: State = event.data["new_state"]
         processed_locally = new_state.attributes.get("processed_locally", False)
+        last_user_content = None
         hass_tool_call = None
+        speech_text = None
 
         _LOGGER.info("Received intent device change event: %s", new_state)
-
-        # if processed_locally:
-        # Will have an intent trigger instead
-        #    return
 
         intent_output = new_state.attributes.get("intent_output")
 
@@ -167,60 +172,41 @@ class DeviceIntentsHandler(DeviceModule):
                     DATA_CHAT_LOGS, {}
                 ).get(conversation_id, {})
 
-                if not chat_log:
-                    return
+                if chat_log:
+                    # Find the last user role entry created datetime
+                    last_user_entry_created_datetime = None
+                    for entry in reversed(chat_log.content):
+                        if entry.role == "user":
+                            last_user_entry_created_datetime = entry.created
+                            if not processed_locally:
+                                last_user_content = entry.content
+                            break
 
-                # _LOGGER.warning(
-                #    "Retrieved chatlog for conversation_id '%s': %s",
-                #    conversation_id,
-                #    chat_log.as_dict(),
-                # )
+                    # Find if a tool result exists after the last user entry
+                    tool_result_after_last_user_entry = None
+                    for entry in chat_log.content:
+                        if (
+                            isinstance(entry, ToolResultContent)
+                            and last_user_entry_created_datetime
+                            and entry.created > last_user_entry_created_datetime
+                        ):
+                            tool_result_after_last_user_entry = entry
+                            break
 
-                # Find the last user role entry created datetime
-                last_user_entry_created_datetime = None
-                last_user_content = None
-                for entry in reversed(chat_log.content):
-                    if entry.role == "user":
-                        last_user_entry_created_datetime = entry.created
-                        if not processed_locally:
-                            last_user_content = entry.content
-                        break
-
-                # Find if a tool result exists after the last user entry
-                tool_result_after_last_user_entry = None
-                for entry in chat_log.content:
-                    if (
-                        isinstance(entry, ToolResultContent)
-                        and last_user_entry_created_datetime
-                        and entry.created > last_user_entry_created_datetime
-                    ):
-                        tool_result_after_last_user_entry = entry
-                        break
-
-                if tool_result_after_last_user_entry:
-                    hass_tool_call = tool_result_after_last_user_entry.tool_name
-
-                if hass_tool_call:
-                    self.navigate_for_intent(hass_tool_call)
-                    return
+                    if tool_result_after_last_user_entry:
+                        hass_tool_call = tool_result_after_last_user_entry.tool_name
+                        # remove any prefix from the tool name if necessary
+                        hass_tool_call = hass_tool_call.split("__")[-1]
 
                 if intent_output:
-                    speech_text = new_state.state
+                    speech_text = get_key("response.speech.plain.speech", intent_output)
                     success_results = get_key("response.data.success", intent_output)
                     if speech_text:
                         word_count = len(speech_text.split())
                         message_font_size = ["10vw", "8vw", "6vw", "4vw"][
                             min(word_count // 6, 3)
                         ]
-                        view_data = {
-                            "title": "AI Response",
-                            "message": speech_text,
-                            "message_font_size": message_font_size,
-                        }
-
                         payload = {
-                            "intent": None,
-                            "command": last_user_content,
                             "response": speech_text,
                             "processed_locally": processed_locally,
                             "changed_entities": [
@@ -228,8 +214,17 @@ class DeviceIntentsHandler(DeviceModule):
                                 for target in success_results
                                 if target.get("type") == "entity"
                             ],
-                            "view_data": view_data,
+                            "view_data": {
+                                "title": "AI Response",
+                                "message": speech_text,
+                                "message_font_size": message_font_size,
+                            },
                         }
+
+                        if hass_tool_call:
+                            payload["intent"] = hass_tool_call
+                        if last_user_content:
+                            payload["command"] = last_user_content
 
                         _LOGGER.debug("Intent payload: %s", payload)
 
@@ -239,7 +234,8 @@ class DeviceIntentsHandler(DeviceModule):
                             VAEvent(VAEventType.INTENT_UPDATE, payload),
                         )
 
-                        self.navigate_for_intent("info")
+                        if not processed_locally:
+                            self.navigate_for_intent("info")
 
     def navigate_for_intent(self, intent_type: str) -> None:
         """Navigate to the appropriate view for the given intent type."""

@@ -87,19 +87,6 @@ class EntityListeners(DeviceModule):
                 )
             )
 
-        # Add intent entity listener
-        if intent_device := self._rt.core.intent_device:
-            _LOGGER.debug("Listening for intent device %s", intent_device)
-            self.listeners.append(
-                EntityStateChangeHandler(
-                    self._hass,
-                    self._config,
-                    intent_device,
-                    VAEventType.INTENT_UPDATE,
-                    "_get_intent_sensor_update_payload",
-                )
-            )
-
         return True
 
     async def async_unload(self) -> bool:

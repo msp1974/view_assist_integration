@@ -284,6 +284,12 @@ class IntentHookHandler(IntentHandler):
             intent_to_dict(intent_obj),
         )
 
+        dispatcher.async_dispatcher_send(
+            intent_obj.hass,
+            f"{intent_obj.device_id}_intent_event",
+            intent_obj,
+        )
+
         view_data = {}
 
         result = await self.handler.async_handle(intent_obj)
@@ -307,7 +313,7 @@ class IntentHookHandler(IntentHandler):
         # Notify device of intent handling
         dispatcher.async_dispatcher_send(
             intent_obj.hass,
-            f"{intent_obj.device_id}-intent_handled",
+            f"{intent_obj.device_id}_intent_event",
             intent_obj,
             response,
             view_data,
