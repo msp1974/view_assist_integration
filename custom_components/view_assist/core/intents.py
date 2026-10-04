@@ -26,11 +26,6 @@ from ..const import (  # noqa: TID252
     ENABLE_INTENT_OVERRIDES,
     INSTALL_CUSTOM_SENTENCES,
 )
-from ..helpers import (  # noqa: TID252
-    get_config_entry_by_device_id,
-    get_entity_attribute,
-    get_entity_id_from_conversation_device_id,
-)
 from ..typed import VAConfigEntry  # noqa: TID252
 from . import intent_handlers
 
@@ -289,26 +284,25 @@ class IntentHookHandler(IntentHandler):
             intent_to_dict(intent_obj),
         )
 
+        dispatcher.async_dispatcher_send(
+            intent_obj.hass,
+            f"{intent_obj.device_id}_intent_event",
+            intent_obj,
+        )
+
         view_data = {}
 
-        if isinstance(self.handler, intent_handlers.IntentOverrideHandler):
-            if hasattr(self.handler, "async_handle"):
-                result = await self.handler.async_handle(
-                    intent_obj=intent_obj,
-                    extra_data=DeviceInfoData(intent_obj).device_info,
-                )
-                if isinstance(result, intent_handlers.IntentOverrideResponse):
-                    response = result.response
-                    view_data = result.view_data
-                else:
-                    response = result
+        result = await self.handler.async_handle(intent_obj)
+        if isinstance(result, intent_handlers.IntentOverrideResponse):
+            response = result.response
+            view_data = result.view_data
 
-                if self.call_original and self.original_handler:
-                    response = await self.original_handler.async_handle(
-                        intent_obj=intent_obj
-                    )
+            if self.call_original and self.original_handler:
+                response = await self.original_handler.async_handle(
+                    intent_obj=intent_obj
+                )
         else:
-            response = await self.handler.async_handle(intent_obj=intent_obj)
+            response = result
 
         _LOGGER.debug(
             "%s response: %s",
@@ -319,62 +313,9 @@ class IntentHookHandler(IntentHandler):
         # Notify device of intent handling
         dispatcher.async_dispatcher_send(
             intent_obj.hass,
-            f"{intent_obj.device_id}-intent_handled",
+            f"{intent_obj.device_id}_intent_event",
             intent_obj,
             response,
             view_data,
         )
         return response
-
-
-class DeviceInfoData:
-    """Class to hold device information."""
-
-    def __init__(self, intent_obj: Intent) -> None:
-        """Initialize the DeviceInfo class."""
-        self.hass = intent_obj.hass
-        self.conversation_device_id = intent_obj.device_id
-
-    @property
-    def entity_id(self) -> str | None:
-        """Get the entity id for the device."""
-        return get_entity_id_from_conversation_device_id(
-            self.hass, self.conversation_device_id
-        )
-
-    @property
-    def entry_id(self) -> str | None:
-        """Get the entry id for the device."""
-        if entry := get_config_entry_by_device_id(
-            self.hass, self.conversation_device_id
-        ):
-            return entry.entry_id
-        return None
-
-    @property
-    def entity_name(self) -> str | None:
-        """Get the entity name for the device."""
-        return (
-            get_entity_attribute(self.hass, self.entity_id, "friendly_name")
-            if self.entity_id
-            else None
-        )
-
-    @property
-    def music_player(self) -> str | None:
-        """Get the media player entity id for the device."""
-        return (
-            get_entity_attribute(self.hass, self.entity_id, "musicplayer_device")
-            if self.entity_id
-            else None
-        )
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Get device information as a dictionary."""
-        return {
-            "name": self.entity_name,
-            "music_player": self.music_player,
-            "entity_id": self.entity_id,
-            "entry_id": self.entry_id,
-        }

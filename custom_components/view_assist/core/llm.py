@@ -8,15 +8,14 @@ import slugify as unicode_slug
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import intent, llm
-from homeassistant.util import dt as dt_util
 
 from ..const import DOMAIN  # noqa: TID252
 from ..helpers import (  # noqa: TID252
+    get_config_entry_by_device_id,
     get_entity_attribute,
     get_entity_id_from_conversation_device_id,
 )
 from ..typed import VAConfigEntry  # noqa: TID252
-from .intents import DeviceInfoData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,11 +106,21 @@ class VAAssistAPI(llm.API):
         prompt = []
 
         if llm_context.device_id:
-            device_info = DeviceInfoData(self.hass, llm_context.device_id)
+            entity_id = get_config_entry_by_device_id(self.hass, llm_context.device_id)
+            entity_name = (
+                get_entity_attribute(self.hass, self.entity_id, "friendly_name")
+                if self.entity_id
+                else None
+            )
+            music_player = (
+                get_entity_attribute(self.hass, self.entity_id, "musicplayer_device")
+                if entity_id
+                else None
+            )
             prompt.append(
                 f"This device_id is {llm_context.device_id}. "
-                f"The friendly name for this device is {device_info.entity_name}. "
-                f"The media player entity id for this device is {device_info.media_player} and should be used for any media playback commands. "
+                f"The friendly name for this device is {entity_name}. "
+                f"The media player entity id for this device is {music_player} and should be used for any media playback commands. "
             )
 
         # Base info

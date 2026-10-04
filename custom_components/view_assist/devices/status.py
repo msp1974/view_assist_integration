@@ -188,6 +188,9 @@ class StatusManager(DeviceModule, Status):
         # Load persisted status from the store
         await self._async_load_from_store()
 
+        if self.extra_data is None:
+            self.extra_data = {}
+
         # Set status from defaults
         self.mode = self._rt.default.mode
         self.do_not_disturb = self._rt.default.do_not_disturb

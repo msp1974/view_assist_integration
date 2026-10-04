@@ -147,9 +147,7 @@ class VAMediaSearchAndPlayHandler(IntentOverrideHandler):
         }
 
     @override
-    async def async_handle(
-        self, intent_obj: intent.Intent, extra_data: dict[str, any] | None = None
-    ) -> intent.IntentResponse:
+    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         """Handle the intent."""
         hass = intent_obj.hass
         slots = self.async_validate_slots(intent_obj.slots)
@@ -168,8 +166,9 @@ class VAMediaSearchAndPlayHandler(IntentOverrideHandler):
         floor_id = floor_slot.get("value")
 
         # Populate media player from extra_data if not provided in the slots, e.g. from a VADeviceInfo context
-        if not entity_name and extra_data:
-            entity_name = extra_data.get("music_player")
+        device_info = self.get_device_info(intent_obj)
+        if not entity_name and device_info:
+            entity_name = device_info.entity_id
 
         # Find matching entities
         match_constraints = intent.MatchTargetsConstraints(

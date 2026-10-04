@@ -45,9 +45,7 @@ class VACancelTimerIntentHandler(IntentOverrideHandler):
             vol.Optional("type"): cv.string,
         }
 
-    async def async_handle(
-        self, intent_obj: intent.Intent, extra_data: dict | None = None
-    ) -> intent.IntentResponse:
+    async def async_handle(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         """Handle the intent with custom logic."""
         _LOGGER.info(
             "%s invoked with intent: %s -> %s -> %s -> %s",
@@ -59,17 +57,18 @@ class VACancelTimerIntentHandler(IntentOverrideHandler):
         )
 
         if intent_obj.intent_type == intent.INTENT_CANCEL_ALL_TIMERS:
-            return await self.cancel_all_timers(intent_obj, extra_data)
+            return await self.cancel_all_timers(intent_obj)
 
-        return await self.cancel_timer(intent_obj, extra_data)
+        return await self.cancel_timer(intent_obj)
 
     async def cancel_all_timers(
-        self, intent_obj: intent.Intent, extra_data: dict | None = None
+        self, intent_obj: intent.Intent
     ) -> intent.IntentResponse:
         """Cancel all active timers."""
         timer_manager = TimerManager.get(intent_obj.hass)
+        device_info = self.get_device_info(intent_obj)
         timers = timer_manager.search_timers(
-            entity_id=extra_data.get("entity_id") if extra_data else None,
+            entity_id=device_info.entity_id if device_info else None,
             include_expired=True,
         )
 
@@ -87,9 +86,7 @@ class VACancelTimerIntentHandler(IntentOverrideHandler):
         response.async_set_speech_slots({"canceled": cancelled})
         return response
 
-    async def cancel_timer(
-        self, intent_obj: intent.Intent, extra_data: dict | None = None
-    ) -> intent.IntentResponse:
+    async def cancel_timer(self, intent_obj: intent.Intent) -> intent.IntentResponse:
         """Cancel a specific timer."""
         timer_manager = TimerManager.get(intent_obj.hass)
         slots = self.async_validate_slots(intent_obj.slots)
@@ -149,8 +146,9 @@ class VACancelTimerIntentHandler(IntentOverrideHandler):
                 else 0,
             )
 
+        device_info = self.get_device_info(intent_obj)
         matching_timers = timer_manager.search_timers(
-            entity_id=extra_data.get("entity_id") if extra_data else None,
+            entity_id=device_info.entity_id if device_info else None,
             timer_id=slots.get("timer_id", {}).get("value") if slots else None,
             name=slots.get("name", {}).get("value") if slots else None,
             expires_at=expires_at,

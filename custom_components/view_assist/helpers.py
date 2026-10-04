@@ -256,6 +256,16 @@ def get_entity_id_from_conversation_device_id(
     return None
 
 
+def get_config_entry_by_conversation_device_id(
+    hass: HomeAssistant, device_id: str
+) -> str | None:
+    """Get the config entry for the VA instance from the conversation device id."""
+    sensor_entity_id = get_entity_id_from_conversation_device_id(hass, device_id)
+    if sensor_entity_id:
+        return get_config_entry_by_entity_id(hass, sensor_entity_id)
+    return None
+
+
 def get_mimic_entity_id(hass: HomeAssistant, browser_id: str | None = None) -> str:
     """Get mimic entity id."""
     master_entry = get_master_config_entry(hass)

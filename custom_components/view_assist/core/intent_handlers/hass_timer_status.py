@@ -35,9 +35,7 @@ class VATimerStatusIntentHandler(IntentOverrideHandler):
             vol.Optional("name"): cv.string,
         }
 
-    async def async_handle(
-        self, intent_obj: Intent, extra_data: dict | None = None
-    ) -> IntentResponse:
+    async def async_handle(self, intent_obj: Intent) -> IntentResponse:
         """Handle the intent with custom logic."""
         _LOGGER.warning(
             "%s invoked with intent: %s -> %s -> %s -> %s",
@@ -82,8 +80,9 @@ class VATimerStatusIntentHandler(IntentOverrideHandler):
                 seconds=slots.get("seconds", {"value": 0})["value"] if slots else 0,
             )
 
+        device_info = self.get_device_info(intent_obj)
         matching_timers = timer_manager.search_timers(
-            entity_id=extra_data.get("entity_id") if extra_data else None,
+            entity_id=device_info.entity_id if device_info else None,
             timer_id=slots.get("timer_id", {}).get("value") if slots else None,
             name=slots.get("name", {}).get("value") if slots else None,
             expires_at=slot_time,
