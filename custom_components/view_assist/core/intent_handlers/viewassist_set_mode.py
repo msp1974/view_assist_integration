@@ -27,17 +27,12 @@ class VASetModeIntentHandler(IntentOverrideHandler):
         }
 
     @override
-    async def async_handle(
-        self, intent_obj: Intent, extra_data: dict | None = None
-    ) -> IntentResponse:
+    async def async_handle(self, intent_obj: Intent) -> IntentResponse:
         """Change View Assist mode."""
         hass = intent_obj.hass
         mode = intent_obj.slots["mode"]["value"]
-        entity_id = (
-            extra_data["entity_id"]
-            if extra_data and "entity_id" in extra_data
-            else None
-        )
+        device_info = self.get_device_info(intent_obj)
+        entity_id = device_info.entity_id if device_info else None
 
         # Call mode change here
         await hass.services.async_call(

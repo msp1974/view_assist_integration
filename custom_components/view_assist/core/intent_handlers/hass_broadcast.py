@@ -12,7 +12,6 @@ from homeassistant.components.assist_satellite import (
 from homeassistant.helpers import area_registry as ar, entity_registry as er, intent
 from homeassistant.helpers.intent import (
     Intent,
-    IntentResponse,
     IntentResponseTarget,
     IntentResponseTargetType,
 )
@@ -49,9 +48,7 @@ class VABroadcastIntentHandler(IntentOverrideHandler):
         }
 
     @override
-    async def async_handle(
-        self, intent_obj: Intent, extra_data: dict | None = None
-    ) -> IntentOverrideResponse:
+    async def async_handle(self, intent_obj: Intent) -> IntentOverrideResponse:
         """Broadcast a message."""
         hass = intent_obj.hass
         ent_reg = er.async_get(hass)

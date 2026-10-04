@@ -49,9 +49,7 @@ class VAStartTimerIntentHandler(IntentOverrideHandler):
             vol.Optional("type"): cv.string,
         }
 
-    async def async_handle(
-        self, intent_obj: Intent, extra_data: dict | None = None
-    ) -> IntentResponse:
+    async def async_handle(self, intent_obj: Intent) -> IntentResponse:
         """Handle the intent with custom logic."""
         _LOGGER.debug(
             "%s invoked with intent: %s -> %s -> %s -> %s",
