@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.conversation import ChatLog, ToolResultContent
+from homeassistant.components.conversation.chat_log import DATA_CHAT_LOGS
 from homeassistant.core import (
     Event,
     EventStateChangedData,
@@ -60,19 +61,19 @@ class DeviceIntentsHandler(DeviceModule):
             self._hass, self._config.runtime_data.core.mic_device
         )
 
+        if device_id:
+            self._config.async_on_unload(
+                async_dispatcher_connect(
+                    self._hass, f"{device_id}-intent_handled", self.async_handle_intent
+                )
+            )
+
         # Add intent sensor listener for vaca
         if intent_device := self._config.runtime_data.core.intent_device:
             # Add listener
             self._config.async_on_unload(
                 async_track_state_change_event(
                     self._hass, intent_device, self._async_on_intent_device_change
-                )
-            )
-
-        if device_id:
-            self._config.async_on_unload(
-                async_dispatcher_connect(
-                    self._hass, f"{device_id}-intent_handled", self.async_handle_intent
                 )
             )
 
@@ -101,7 +102,7 @@ class DeviceIntentsHandler(DeviceModule):
         """Handle the intent dispatched for the device."""
 
         intent_type = intent_obj.intent_type
-        speech_text = get_key("plain.speech", response.speech)
+        speech_text = response.speech
         sensor_entity = get_sensor_entity_from_instance(
             self._hass, self._config.entry_id
         )
@@ -153,34 +154,41 @@ class DeviceIntentsHandler(DeviceModule):
 
         _LOGGER.info("Received intent device change event: %s", new_state)
 
-        if processed_locally:
-            # Will have an intent trigger instead
-            return
+        # if processed_locally:
+        # Will have an intent trigger instead
+        #    return
 
         intent_output = new_state.attributes.get("intent_output")
 
         if intent_output:
             if conversation_id := intent_output.get("conversation_id"):
                 # Get conversation from chat log
-                chatlog: ChatLog = self._hass.data.get(
-                    "conversation_chat_logs", {}
-                ).get(conversation_id, [])
+                chat_log: dict[str, ChatLog] = self._hass.data.get(
+                    DATA_CHAT_LOGS, {}
+                ).get(conversation_id, {})
+
+                if not chat_log:
+                    return
+
+                # _LOGGER.warning(
+                #    "Retrieved chatlog for conversation_id '%s': %s",
+                #    conversation_id,
+                #    chat_log.as_dict(),
+                # )
 
                 # Find the last user role entry created datetime
                 last_user_entry_created_datetime = None
-                for entry in reversed(chatlog.content):
+                last_user_content = None
+                for entry in reversed(chat_log.content):
                     if entry.role == "user":
                         last_user_entry_created_datetime = entry.created
+                        if not processed_locally:
+                            last_user_content = entry.content
                         break
-                _LOGGER.debug(
-                    "Last user entry created datetime for conversation_id '%s': %s",
-                    conversation_id,
-                    last_user_entry_created_datetime,
-                )
 
                 # Find if a tool result exists after the last user entry
                 tool_result_after_last_user_entry = None
-                for entry in chatlog.content:
+                for entry in chat_log.content:
                     if (
                         isinstance(entry, ToolResultContent)
                         and last_user_entry_created_datetime
@@ -192,44 +200,46 @@ class DeviceIntentsHandler(DeviceModule):
                 if tool_result_after_last_user_entry:
                     hass_tool_call = tool_result_after_last_user_entry.tool_name
 
-        if hass_tool_call:
-            self.navigate_for_intent(hass_tool_call)
-            return
+                if hass_tool_call:
+                    self.navigate_for_intent(hass_tool_call)
+                    return
 
-        if intent_output:
-            speech_text = get_key("response.speech.plain.speech", intent_output)
-            success_results = get_key("response.data.success", intent_output)
-            if speech_text:
-                word_count = len(speech_text.split())
-                message_font_size = ["10vw", "8vw", "6vw", "4vw"][
-                    min(word_count // 6, 3)
-                ]
-                view_data = {
-                    "title": "AI Response",
-                    "message": speech_text,
-                    "message_font_size": message_font_size,
-                }
+                if intent_output:
+                    speech_text = new_state.state
+                    success_results = get_key("response.data.success", intent_output)
+                    if speech_text:
+                        word_count = len(speech_text.split())
+                        message_font_size = ["10vw", "8vw", "6vw", "4vw"][
+                            min(word_count // 6, 3)
+                        ]
+                        view_data = {
+                            "title": "AI Response",
+                            "message": speech_text,
+                            "message_font_size": message_font_size,
+                        }
 
-                payload = {
-                    "intent": None,
-                    "command": None,
-                    "response": speech_text,
-                    "processed_locally": processed_locally,
-                    "changed_entities": [
-                        target.get("id")
-                        for target in success_results
-                        if target.get("type") == "entity"
-                    ],
-                    "view_data": view_data,
-                }
+                        payload = {
+                            "intent": None,
+                            "command": last_user_content,
+                            "response": speech_text,
+                            "processed_locally": processed_locally,
+                            "changed_entities": [
+                                target.get("id")
+                                for target in success_results
+                                if target.get("type") == "entity"
+                            ],
+                            "view_data": view_data,
+                        }
 
-                async_dispatcher_send(
-                    self._hass,
-                    f"{DOMAIN}_{self._config.entry_id}_event",
-                    VAEvent(VAEventType.INTENT_UPDATE, payload),
-                )
+                        _LOGGER.debug("Intent payload: %s", payload)
 
-                self.navigate_for_intent("info")
+                        async_dispatcher_send(
+                            self._hass,
+                            f"{DOMAIN}_{self._config.entry_id}_event",
+                            VAEvent(VAEventType.INTENT_UPDATE, payload),
+                        )
+
+                        self.navigate_for_intent("info")
 
     def navigate_for_intent(self, intent_type: str) -> None:
         """Navigate to the appropriate view for the given intent type."""
