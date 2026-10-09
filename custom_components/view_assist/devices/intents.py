@@ -60,6 +60,7 @@ class DeviceIntentsHandler(DeviceModule):
         device_id = get_device_id_from_entity_id(
             self._hass, self._config.runtime_data.core.mic_device
         )
+        device_id = None
 
         if device_id:
             self._config.async_on_unload(
@@ -67,15 +68,6 @@ class DeviceIntentsHandler(DeviceModule):
                     self._hass,
                     f"{device_id}_intent_event",
                     self.async_handle_intent_event,
-                )
-            )
-
-        # Add intent sensor listener for vaca
-        if intent_device := self._config.runtime_data.core.intent_device:
-            # Add listener
-            self._config.async_on_unload(
-                async_track_state_change_event(
-                    self._hass, intent_device, self._async_on_intent_device_change
                 )
             )
 
@@ -94,6 +86,16 @@ class DeviceIntentsHandler(DeviceModule):
             # If not change to state, ignore
             return False
         return True
+
+    async def async_handle_chatlog_event(
+        self,
+        chatlog: dict[str, Any],
+    ) -> None:
+        """Handle chat log events for the device."""
+        _LOGGER.debug(
+            "Handling chat log event for chatlog: %s",
+            chatlog,
+        )
 
     async def async_handle_intent_event(
         self,
