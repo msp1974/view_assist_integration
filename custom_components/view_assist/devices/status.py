@@ -50,7 +50,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Time to wait for further attribute changes before sending a status update,
 # to batch rapid successive changes into a single notification.
-NOTIFY_DEBOUNCE_SECONDS = 0.5
+NOTIFY_DEBOUNCE_SECONDS = 0.2
 
 PERSISTED_ATTRIBUTES = [
     "muted",

@@ -98,27 +98,29 @@ class ConversationMonitor:
             if content := data.get("content"):
                 created = content.get("created")
                 if created and created >= entry_info.last_updated:
-                    if content.get("role") == "user":
+                    if content.get("role") == "user" and content.get("content"):
                         self.conversations[
                             conversation_id
                         ].last_user_content = content.get("content")
                         conversation.last_updated = dt_util.now()
-                    if content.get("role") == "tool_result":
+                        payload = {"command": conversation.last_user_content}
+                    elif content.get("role") == "tool_result" and content.get(
+                        "tool_name"
+                    ):
                         tool_name = content.get("tool_name")
                         tool_name = tool_name.split("__")[-1]
                         self.conversations[conversation_id].last_tool_result = tool_name
                         conversation.last_updated = dt_util.now()
-                    if content.get("role") == "assistant":
+                        payload = {"intent": conversation.last_tool_result}
+                    elif content.get("role") == "assistant" and content.get("content"):
                         self.conversations[
                             conversation_id
                         ].last_assistant_content = content.get("content")
                         conversation.last_updated = dt_util.now()
-
-                    payload = {
-                        "command": conversation.last_user_content,
-                        "intent": conversation.last_tool_result,
-                        "response": conversation.last_assistant_content,
-                    }
+                        payload = {
+                            "intent": conversation.last_tool_result,
+                            "response": conversation.last_assistant_content,
+                        }
 
         elif event_type == ChatLogEventType.UPDATED:
             # For non intent responses, the response text is only shown in a chat log update event
@@ -128,17 +130,15 @@ class ConversationMonitor:
             for entry in get_key("chat_log.content", data):
                 created = entry.get("created")
                 if created and created >= entry_info.last_updated:
-                    if entry.get("role") == "assistant":
+                    if entry.get("role") == "assistant" and entry.get("content"):
                         self.conversations[
                             conversation_id
                         ].last_assistant_content = entry.get("content")
                         conversation.last_updated = dt_util.now()
-
-            payload = {
-                "command": conversation.last_user_content,
-                "intent": conversation.last_tool_result,
-                "response": conversation.last_assistant_content,
-            }
+                        payload = {
+                            "intent": conversation.last_tool_result,
+                            "response": conversation.last_assistant_content,
+                        }
 
         elif event_type == ChatLogEventType.DELETED:
             # Handle deleted chat log entries if necessary
@@ -184,18 +184,14 @@ class ConversationMonitor:
                     if conversation_log:
                         log_entries = conversation_log.content
                         for entry in log_entries:
-                            if isinstance(entry, AssistantContent):
+                            if isinstance(entry, AssistantContent) and entry.content:
+                                c_id = conversation.conversation_id
                                 self.conversations[
-                                    conversation.conversation_id
+                                    c_id
                                 ].last_assistant_content = entry.content
-                                self.conversations[
-                                    conversation.conversation_id
-                                ].last_updated = dt_util.now()
-                                conversation = self.conversations[
-                                    conversation.conversation_id
-                                ]
+                                self.conversations[c_id].last_updated = dt_util.now()
+                                conversation = self.conversations[c_id]
                                 payload = {
-                                    "command": conversation.last_user_content,
                                     "intent": conversation.last_tool_result,
                                     "response": conversation.last_assistant_content,
                                 }
