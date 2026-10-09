@@ -1,0 +1,38 @@
+language: "en"
+
+expansion_rules:
+  the: "(the|my|our)"
+
+skip_words:
+  - "please"
+  - "can you"
+  - "could you"
+  - "would you"
+  - "for me"
+
+intents:
+  VAWhatDidYouSay:
+    data:
+      - sentences:
+          - "what (did|do) you [just] say"
+          - "repeat [that|yourself|what you said]"
+          - "say (that|it) again"
+          - "come again"
+        response: what_did_you_say
+
+responses:
+  intents:
+    VAWhatDidYouSay:
+      what_did_you_say: >-
+        {#- TRANSLATE 1 of 2: the words spoken before the repeated text. -#}
+        {%- set said_prefix = 'I said' -%}
+        {#- TRANSLATE 2 of 2: spoken when there is nothing to repeat. -#}
+        {%- set nothing_said = "I haven't said anything yet." -%}
+
+        {#- Do not edit below this line -#}
+        {%- set last_said = slots.get('last_response') if slots is defined and slots else none -%}
+        {%- if last_said -%}
+        {{ said_prefix }} {{ last_said | replace(said_prefix, '') | trim }}
+        {%- else -%}
+        {{ nothing_said }}
+        {%- endif -%}

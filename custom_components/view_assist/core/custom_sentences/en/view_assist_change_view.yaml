@@ -1,0 +1,27 @@
+language: "en"
+lists:
+  view:
+    values:
+      - in: clock
+        out: clock
+      - in: weather
+        out: weather
+      - in: info
+        out: info
+      - in: infopic
+        out: infopic
+      - in: music
+        out: music 
+intents:
+  ViewAssistChangeView:
+    data:
+      - sentences:
+          - "set view [to] {view}"
+          - "change [to] {view} view"
+          - "set [to] {view} view"
+responses:
+  intents:
+    ViewAssistChangeView:
+      default: >
+        {% set view = slots.view if slots.view is defined else none %}
+        "Setting view to {{view}}"

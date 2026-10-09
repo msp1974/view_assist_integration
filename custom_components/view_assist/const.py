@@ -297,7 +297,10 @@ INTENT_TO_VIEW_MAPPING = {
         INTENT_MEDIA_SEARCH_AND_PLAY,
         INTENT_MEDIA_UNPAUSE,
     ],
-    CONF_CLIMATE: [intent.INTENT_GET_TEMPERATURE],
+    CONF_CLIMATE: [
+        intent.INTENT_GET_TEMPERATURE,
+        "HassClimateSetTemperature",
+    ],
     CONF_WEATHER: ["HassGetWeather"],
     "list": [
         "todo__get_items",
@@ -307,5 +310,10 @@ INTENT_TO_VIEW_MAPPING = {
         "HassListCompleteItem",
         "HassListRemoveItem",
     ],
-    "info": ["info", "HassBroadcast"],
+    "calendar": ["ViewAssistShowCalendar"],
+    "info": [
+        "info",
+        "HassBroadcast",
+        "VAWhatDidYouSay",
+    ],
 }
